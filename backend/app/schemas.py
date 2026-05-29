@@ -1,23 +1,24 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
 # ============================================================
-# AUTH SCHEMAS
+# USER SCHEMAS
 # ============================================================
 
 class UserCreate(BaseModel):
     username: str
     password: str
-    email: Optional[str] = None
     full_name: Optional[str] = None
-    role: Optional[str] = "viewer"
+    email: Optional[str] = None
+    role: str = "viewer"
+    is_active: bool = True
 
 
 class UserUpdate(BaseModel):
-    email: Optional[str] = None
     full_name: Optional[str] = None
+    email: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -25,11 +26,11 @@ class UserUpdate(BaseModel):
 class UserResponse(BaseModel):
     id: int
     username: str
-    email: Optional[str] = None
     full_name: Optional[str] = None
+    email: Optional[str] = None
     role: str
-    is_2fa_enabled: bool
     is_active: bool
+    totp_enabled: bool
     created_at: datetime
     last_login: Optional[datetime] = None
 
@@ -40,10 +41,7 @@ class UserResponse(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
-
-
-class TwoFAVerify(BaseModel):
-    totp_code: str
+    totp_code: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -53,7 +51,7 @@ class TokenResponse(BaseModel):
     user: Optional[UserResponse] = None
 
 
-class TwoFASetupResponse(BaseModel):
+class TOTPSetupResponse(BaseModel):
     secret: str
     qr_code_url: str
     provisioning_uri: str
@@ -71,11 +69,11 @@ class ChangePasswordRequest(BaseModel):
 class OLTCreate(BaseModel):
     name: str
     ip: str
-    port: int = 22
+    port: int = 23
     username: str
     password: str
-    protocol: str = "ssh"  # ssh, telnet, snmp
-    snmp_community: Optional[str] = "public"
+    protocol: str = "telnet"
+    snmp_community: Optional[str] = None
     snmp_version: Optional[str] = "2c"
 
 
@@ -97,7 +95,6 @@ class OLTResponse(BaseModel):
     port: int
     username: str
     protocol: str
-    snmp_community: Optional[str] = None
     status: str
     model: Optional[str] = None
     firmware: Optional[str] = None
@@ -112,8 +109,7 @@ class OLTPortResponse(BaseModel):
     id: int
     olt_id: int
     slot: int
-    card: int = 1
-    port: int
+    pon: int          # porta PON: gpon-olt_SLOT/PON
     port_type: str
     description: Optional[str] = None
     status: str
@@ -133,83 +129,35 @@ class ONUStatus(BaseModel):
     admin_state: str
     oper_state: str
     last_down_cause: Optional[str] = None
-    status_color: str = "gray"  # green, yellow, red, gray
-
-
-class ONUDetail(BaseModel):
-    onu_index: str
-    serial_number: Optional[str] = None
-    vendor_id: Optional[str] = None
-    onu_type: Optional[str] = None
-    run_state: Optional[str] = None
-    omci_state: Optional[str] = None
-    online_time: Optional[str] = None
-    last_down_cause: Optional[str] = None
-    fec: Optional[str] = None
-    dba: Optional[str] = None
-
-
-class ONUPower(BaseModel):
-    onu_index: str
-    rx_power: Optional[float] = None
-    tx_power: Optional[float] = None
-    attenuation: Optional[float] = None
-    rx_status: str = "unknown"  # normal, warning, critical, unknown
+    status_color: str
     olt_rx_power: Optional[float] = None
-    olt_rx_status: str = "unknown"
-
-
-class ONUDistance(BaseModel):
-    onu_index: str
-    distance_m: Optional[int] = None
-
-
-class ONUWanInfo(BaseModel):
-    onu_index: str
-    connection_type: Optional[str] = None
-    status: Optional[str] = None
-    ip_address: Optional[str] = None
-    gateway: Optional[str] = None
-    dns: Optional[str] = None
-
-
-class ONUVoipStatus(BaseModel):
-    onu_index: str
-    status: Optional[str] = None
-
-
-class ONUTemperature(BaseModel):
-    onu_index: str
-    temperature: Optional[float] = None
-    temp_status: str = "unknown"  # normal, warning, critical, unknown
-
-
-class ONUFirmware(BaseModel):
-    onu_index: str
-    current_version: Optional[str] = None
-    active_version: Optional[str] = None
-    backup_version: Optional[str] = None
-
-
-class ONUFullInfo(BaseModel):
-    status: Optional[ONUStatus] = None
-    detail: Optional[ONUDetail] = None
-    power: Optional[ONUPower] = None
-    distance: Optional[ONUDistance] = None
-    wan: Optional[ONUWanInfo] = None
-    voip: Optional[ONUVoipStatus] = None
-    temperature: Optional[ONUTemperature] = None
-    firmware: Optional[ONUFirmware] = None
-    cached: bool = False
-    cache_time: Optional[str] = None
+    olt_rx_status: Optional[str] = None
 
 
 class PONStatusResponse(BaseModel):
     olt_id: int
     slot: int
-    port: int
+    pon: int
+    olt_interface: str
     onus: List[ONUStatus]
-    cached: bool = False
-    cache_time: Optional[str] = None
-    olt_rx_power: Optional[str] = None
-    olt_tx_power: Optional[str] = None
+    total: int
+    online: int
+    offline: int
+    cached: bool
+    last_updated: str
+
+
+class ONUFullInfo(BaseModel):
+    onu_index: str
+    olt_id: int
+    onu_interface: str
+    status: Optional[Dict] = None
+    detail: Optional[Dict] = None
+    power: Optional[Dict] = None
+    distance: Optional[Dict] = None
+    wan: Optional[Dict] = None
+    voip: Optional[Dict] = None
+    temperature: Optional[Dict] = None
+    firmware: Optional[Dict] = None
+    cached: bool
+    last_updated: str

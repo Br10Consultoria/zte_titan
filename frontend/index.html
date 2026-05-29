@@ -342,14 +342,13 @@
           </div>
           <div class="table-container">
             <table>
-              <thead><tr><th>Interface</th><th>Slot</th><th>Card</th><th>Porta</th><th>Tipo</th><th>Status</th><th>ONUs</th><th>Ações</th></tr></thead>
+              <thead><tr><th>Interface</th><th>Slot</th><th>PON</th><th>Tipo</th><th>Status</th><th>ONUs</th><th>Ações</th></tr></thead>
                <tbody>
                  <template x-for="p in selectedOLTPorts" :key="p.id">
                    <tr>
-                     <td><code x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.port" style="color:#60a5fa"></code></td>
+                     <td><code x-text="'gpon-olt_'+p.slot+'/'+p.pon" style="color:#60a5fa"></code></td>
                      <td x-text="p.slot"></td>
-                     <td x-text="p.card || 1"></td>
-                     <td x-text="p.port"></td>
+                     <td x-text="p.pon"></td>
                     <td><span class="badge badge-blue" x-text="p.port_type.toUpperCase()"></span></td>
                     <td><span :class="p.status==='online'?'badge badge-green':'badge badge-gray'" x-text="p.status"></span></td>
                     <td x-text="p.onu_count"></td>
@@ -383,7 +382,7 @@
             <select x-model="onuFilter.port_id" class="input-field" style="width:140px" :disabled="!onuFilter.olt_id">
               <option value="">Selecione a PON</option>
               <template x-for="p in filteredPorts" :key="p.id">
-                <option :value="p.id + '|' + p.slot + '|' + (p.card || 1) + '|' + p.port" x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.port"></option>
+                <option :value="p.id + '|' + p.slot + '|' + p.pon" x-text="'gpon-olt_'+p.slot+'/'+p.pon"></option>
               </template>
             </select>
             <button @click="loadONUStatus(false)" class="btn btn-primary" :disabled="!onuFilter.port_id">

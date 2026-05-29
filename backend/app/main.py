@@ -71,15 +71,39 @@ def startup_event():
 
 
 def _migrate_db():
-    """Aplica migrações incrementais no banco SQLite sem perder dados."""
+    """
+    Aplica migrações incrementais no banco SQLite sem perder dados.
+    Renomeia card/port para pon conforme sintaxe ZTE Titan (gpon-olt_SLOT/PON).
+    """
     from .database import engine
+    import sqlalchemy as sa
+
     with engine.connect() as conn:
-        # Adiciona coluna 'card' na tabela olt_ports se não existir
+        # Verifica colunas existentes na tabela olt_ports
         try:
-            conn.execute(__import__('sqlalchemy').text(
-                "ALTER TABLE olt_ports ADD COLUMN card INTEGER NOT NULL DEFAULT 1"
-            ))
-            conn.commit()
-            print("✅ Migração: coluna 'card' adicionada à tabela olt_ports")
-        except Exception:
-            pass  # Coluna já existe
+            result = conn.execute(sa.text("PRAGMA table_info(olt_ports)"))
+            cols = {row[1] for row in result.fetchall()}
+
+            # Se ainda tem a coluna 'port' antiga (sem 'pon'), migra
+            if "port" in cols and "pon" not in cols:
+                conn.execute(sa.text("ALTER TABLE olt_ports ADD COLUMN pon INTEGER NOT NULL DEFAULT 1"))
+                # Copia o valor de 'port' para 'pon'
+                conn.execute(sa.text("UPDATE olt_ports SET pon = port"))
+                conn.commit()
+                print("✅ Migração: coluna 'pon' criada a partir de 'port'")
+
+            # Se tem 'card' mas não 'pon', usa card como pon
+            elif "card" in cols and "pon" not in cols:
+                conn.execute(sa.text("ALTER TABLE olt_ports ADD COLUMN pon INTEGER NOT NULL DEFAULT 1"))
+                conn.execute(sa.text("UPDATE olt_ports SET pon = card"))
+                conn.commit()
+                print("✅ Migração: coluna 'pon' criada a partir de 'card'")
+
+            # Garante que pon existe
+            elif "pon" not in cols:
+                conn.execute(sa.text("ALTER TABLE olt_ports ADD COLUMN pon INTEGER NOT NULL DEFAULT 1"))
+                conn.commit()
+                print("✅ Migração: coluna 'pon' adicionada")
+
+        except Exception as e:
+            print(f"⚠️  Migração: {e}")

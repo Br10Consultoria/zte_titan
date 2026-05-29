@@ -1,3 +1,8 @@
+"""
+OLT Client para ZTE Titan (C600/C610/C620/C650)
+Sintaxe de interface conforme manual: gpon-olt_SLOT/PON (2 partes)
+Exemplos: gpon-olt_1/1, gpon-olt_1/2, gpon-olt_2/1 ...
+"""
 import re
 import time
 import socket
@@ -48,7 +53,6 @@ class SimpleTelnet:
                 if i + 2 < len(data):
                     cmd = data[i+1:i+2]
                     opt = data[i+2:i+3]
-                    # Responde WONT para DO e DONT para WILL
                     if cmd == self.DO:
                         self.sock.sendall(self.IAC + self.WONT + opt)
                     elif cmd == self.WILL:
@@ -78,29 +82,31 @@ class SimpleTelnet:
     def read_very_eager(self) -> bytes:
         self.sock.settimeout(0.3)
         try:
-            raw = self.sock.recv(8192)
-            if raw:
-                result = self._process_iac(raw)
-                self._buf += result
-        except socket.timeout:
-            pass
+            data = b""
+            while True:
+                chunk = self._recv_raw(4096)
+                if not chunk:
+                    break
+                data += self._process_iac(chunk)
+            return data
+        except Exception:
+            return b""
         finally:
             self.sock.settimeout(self.timeout)
-        out = self._buf
-        self._buf = b""
-        return out
 
     def write(self, data: bytes):
         self.sock.sendall(data)
 
     def close(self):
-        if self.sock:
-            try:
-                self.sock.close()
-            except Exception:
-                pass
-            self.sock = None
+        try:
+            self.sock.close()
+        except Exception:
+            pass
 
+
+# ============================================================
+# CLIENTES SSH E TELNET
+# ============================================================
 
 class OLTSSHClient:
     """Cliente SSH para comunicação com OLTs ZTE Titan."""
@@ -118,41 +124,31 @@ class OLTSSHClient:
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.client.connect(
-                hostname=self.ip,
-                port=self.port,
-                username=self.username,
-                password=self.password,
+                self.ip, port=self.port,
+                username=self.username, password=self.password,
                 timeout=settings.SSH_TIMEOUT,
-                look_for_keys=False,
-                allow_agent=False
+                look_for_keys=False, allow_agent=False
             )
-            # Abre um shell interativo para suportar paginação
             self.shell = self.client.invoke_shell(width=250, height=50)
             time.sleep(1)
-            self._read_until_prompt()
+            # Consome o banner inicial
+            if self.shell.recv_ready():
+                self.shell.recv(8192)
+            # Desabilita paginação
+            self._send_raw("terminal length 0\n")
+            time.sleep(0.5)
+            if self.shell.recv_ready():
+                self.shell.recv(8192)
+        except OLTConnectionError:
+            raise
         except Exception as e:
             raise OLTConnectionError(f"Falha ao conectar via SSH em {self.ip}:{self.port} - {str(e)}")
 
-    def _read_until_prompt(self, timeout: int = 10) -> str:
-        """Lê a saída até encontrar um prompt ou timeout."""
-        output = ""
-        self.shell.settimeout(timeout)
-        try:
-            while True:
-                chunk = self.shell.recv(4096).decode("utf-8", errors="replace")
-                output += chunk
-                # Detecta prompts comuns da ZTE Titan
-                if re.search(r'[>#]\s*$', chunk.strip()):
-                    break
-                if "More" in chunk or "--More--" in chunk:
-                    self.shell.send(" ")
-                    time.sleep(0.2)
-        except socket.timeout:
-            pass
-        return output
+    def _send_raw(self, cmd: str):
+        self.shell.send(cmd)
+        time.sleep(0.3)
 
     def execute_command(self, command: str, timeout: int = None) -> str:
-        """Executa um comando e retorna a saída completa."""
         if not self.shell:
             raise OLTConnectionError("Não conectado à OLT")
 
@@ -169,31 +165,27 @@ class OLTSSHClient:
                 if self.shell.recv_ready():
                     chunk = self.shell.recv(8192).decode("utf-8", errors="replace")
                     output += chunk
-                    # Trata paginação "-- More --"
                     if re.search(r'--\s*[Mm]ore\s*--', chunk):
                         self.shell.send(" ")
                         time.sleep(0.2)
                         continue
-                    # Verifica se chegou ao prompt
                     if re.search(r'[>#]\s*$', chunk.strip()):
                         break
                 else:
                     time.sleep(0.1)
                     if not self.shell.recv_ready():
-                        # Aguarda mais um pouco para garantir que a saída está completa
                         time.sleep(0.3)
                         if not self.shell.recv_ready():
                             break
         except socket.timeout:
             pass
 
-        # Remove o comando enviado da saída e o prompt final
+        # Limpa saída: remove o eco do comando e linhas de prompt
         lines = output.split('\n')
         clean_lines = []
         for line in lines:
             stripped = line.strip()
             if stripped and not stripped.endswith(command.strip()):
-                # Remove linhas de prompt (terminam com # ou >)
                 if not re.match(r'^[\w\-\.]+[#>]\s*$', stripped):
                     clean_lines.append(line.rstrip())
 
@@ -223,15 +215,17 @@ class OLTTelnetClient:
         try:
             self.tn = SimpleTelnet(self.ip, self.port, timeout=settings.SSH_TIMEOUT)
             self.tn.open()
-            # Login
-            self.tn.read_until(b"Username:", timeout=10)
+            self.tn.read_until(b"Username:", timeout=15)
             self.tn.write(self.username.encode("ascii") + b"\n")
             self.tn.read_until(b"Password:", timeout=10)
             self.tn.write(self.password.encode("ascii") + b"\n")
-            # Aguarda prompt
-            output = self.tn.read_until(b"#", timeout=10).decode("utf-8", errors="replace")
+            output = self.tn.read_until(b"#", timeout=15).decode("utf-8", errors="replace")
             if "#" not in output and ">" not in output:
                 raise OLTConnectionError("Login Telnet falhou - prompt não encontrado")
+            # Desabilita paginação
+            self.tn.write(b"terminal length 0\n")
+            time.sleep(0.5)
+            self.tn.read_very_eager()
         except OLTConnectionError:
             raise
         except Exception as e:
@@ -268,9 +262,9 @@ class OLTTelnetClient:
 
 def get_olt_client(ip: str, port: int, username: str, password: str, protocol: str):
     """Factory para criar o cliente correto baseado no protocolo."""
-    if protocol == "ssh":
+    if protocol.lower() == "ssh":
         return OLTSSHClient(ip, port, username, password)
-    elif protocol == "telnet":
+    elif protocol.lower() == "telnet":
         return OLTTelnetClient(ip, port, username, password)
     else:
         raise ValueError(f"Protocolo não suportado: {protocol}")
@@ -278,20 +272,25 @@ def get_olt_client(ip: str, port: int, username: str, password: str, protocol: s
 
 # ============================================================
 # PARSERS DE SAÍDA DOS COMANDOS ZTE TITAN
+# Sintaxe: gpon-olt_SLOT/PON  (2 partes, conforme manual)
+# Exemplos: gpon-olt_1/1, gpon-olt_1/2, gpon-olt_2/8
 # ============================================================
 
 def parse_onu_state(output: str) -> List[Dict]:
     """
-    Parseia a saída de: show gpon onu state gpon-olt_X/X/X
-    Retorna lista de ONUs com seus estados.
+    Parseia: show gpon onu state gpon-olt_SLOT/PON
+    Formato esperado de cada linha:
+      SLOT/PON:ONU_ID   admin_state   oper_state   last_down_cause
+    Ex: 1/1:1   enable   working   -
+        1/2:85  enable   disable   LOS
     """
     onus = []
     lines = output.split('\n')
     for line in lines:
         line = line.strip()
-        # Padrão: 1/2/2:85    enable    working    -
+        # Aceita índices no formato SLOT/PON:ID
         match = re.match(
-            r'(\d+/\d+/\d+:\d+)\s+(enable|disable)\s+(working|disable|initial|ranging|standby|unknown)\s*(\S*)',
+            r'(\d+/\d+:\d+)\s+(enable|disable)\s+(working|disable|initial|ranging|standby|unknown)\s*(\S*)',
             line
         )
         if match:
@@ -300,7 +299,6 @@ def parse_onu_state(output: str) -> List[Dict]:
             oper_state = match.group(3)
             last_down = match.group(4) if match.group(4) and match.group(4) != '-' else None
 
-            # Define cor de status
             if oper_state == "working":
                 color = "green"
             elif oper_state in ("initial", "ranging"):
@@ -319,10 +317,10 @@ def parse_onu_state(output: str) -> List[Dict]:
 
 
 def parse_onu_detail(output: str, onu_index: str) -> Dict:
-    """Parseia a saída de: show gpon onu detail-info gpon-onu_X/X/X:Y"""
+    """Parseia: show gpon onu detail-info gpon-onu_SLOT/PON:ID"""
     result = {"onu_index": onu_index}
     patterns = {
-        "serial_number": r'Serial\s*[Nn]umber\s*[:\-]\s*(\S+)',
+        "serial_number": r'[Ss]erial\s*[Nn]umber\s*[:\-]\s*(\S+)',
         "vendor_id": r'[Vv]endor\s*[Ii][Dd]\s*[:\-]\s*(\S+)',
         "onu_type": r'ONU\s*[Tt]ype\s*[:\-]\s*(\S+)',
         "run_state": r'[Rr]un\s*[Ss]tate\s*[:\-]\s*(\S+)',
@@ -333,14 +331,14 @@ def parse_onu_detail(output: str, onu_index: str) -> Dict:
         "dba": r'DBA\s*[:\-]\s*(\S+)',
     }
     for key, pattern in patterns.items():
-        match = re.search(pattern, output)
-        if match:
-            result[key] = match.group(1).strip()
+        m = re.search(pattern, output)
+        if m:
+            result[key] = m.group(1).strip()
     return result
 
 
 def parse_onu_power(output: str, onu_index: str) -> Dict:
-    """Parseia a saída de: show pon power attenuation gpon-onu_X/X/X:Y"""
+    """Parseia: show pon power attenuation gpon-onu_SLOT/PON:ID"""
     result = {"onu_index": onu_index}
 
     rx_match = re.search(r'[Rr][Xx]\s*[Pp]ower\s*[:\-]?\s*([-\d\.]+)\s*dBm', output)
@@ -368,11 +366,12 @@ def parse_onu_power(output: str, onu_index: str) -> Dict:
 
 
 def parse_olt_rx_power(output: str) -> List[Dict]:
-    """Parseia a saída de: show pon power olt-rx gpon-olt_X/X/X"""
+    """Parseia: show pon power olt-rx gpon-olt_SLOT/PON"""
     results = []
     lines = output.split('\n')
     for line in lines:
-        match = re.match(r'(\d+/\d+/\d+:\d+)\s+([-\d\.]+)\s*dBm', line.strip())
+        # Aceita SLOT/PON:ID ou SLOT/CARD/PORT:ID
+        match = re.match(r'(\d+/\d+(?:/\d+)?:\d+)\s+([-\d\.]+)\s*dBm', line.strip())
         if match:
             onu_index = match.group(1)
             power = float(match.group(2))
@@ -391,7 +390,7 @@ def parse_olt_rx_power(output: str) -> List[Dict]:
 
 
 def parse_onu_distance(output: str, onu_index: str) -> Dict:
-    """Parseia a saída de: show gpon onu distance gpon-onu_X/X/X:Y"""
+    """Parseia: show gpon onu distance gpon-onu_SLOT/PON:ID"""
     result = {"onu_index": onu_index}
     match = re.search(r'[Dd]istance\s*[:\-]?\s*(\d+)\s*m', output)
     if match:
@@ -400,7 +399,7 @@ def parse_onu_distance(output: str, onu_index: str) -> Dict:
 
 
 def parse_onu_wan(output: str, onu_index: str) -> Dict:
-    """Parseia a saída de: show gpon remote-onu wan-info gpon-onu_X/X/X:Y"""
+    """Parseia: show gpon remote-onu wan-info gpon-onu_SLOT/PON:ID"""
     result = {"onu_index": onu_index}
     patterns = {
         "connection_type": r'[Cc]onnection\s*[Tt]ype\s*[:\-]\s*(\S+)',
@@ -410,14 +409,14 @@ def parse_onu_wan(output: str, onu_index: str) -> Dict:
         "dns": r'DNS\s*[:\-]\s*(\d+\.\d+\.\d+\.\d+)',
     }
     for key, pattern in patterns.items():
-        match = re.search(pattern, output)
-        if match:
-            result[key] = match.group(1).strip()
+        m = re.search(pattern, output)
+        if m:
+            result[key] = m.group(1).strip()
     return result
 
 
 def parse_onu_voip(output: str, onu_index: str) -> Dict:
-    """Parseia a saída de: show gpon remote-onu voip-status gpon-onu_X/X/X:Y"""
+    """Parseia: show gpon remote-onu voip-status gpon-onu_SLOT/PON:ID"""
     result = {"onu_index": onu_index}
     match = re.search(r'(Registered|Unregistered|Failed|registered|unregistered|failed)', output)
     if match:
@@ -452,20 +451,24 @@ def parse_onu_firmware(output: str, onu_index: str) -> Dict:
         "backup_version": r'[Bb]ackup\s*[Vv]ersion\s*[:\-]\s*(\S+)',
     }
     for key, pattern in patterns.items():
-        match = re.search(pattern, output)
-        if match:
-            result[key] = match.group(1).strip()
+        m = re.search(pattern, output)
+        if m:
+            result[key] = m.group(1).strip()
     return result
 
 
 def parse_onu_baseinfo(output: str) -> List[Dict]:
-    """Parseia a saída de: show gpon onu baseinfo gpon-olt_X/X/X"""
+    """
+    Parseia: show gpon onu baseinfo gpon-olt_SLOT/PON
+    Formato: SLOT/PON:ID   SERIAL   MODEL   admin_state   oper_state
+    Ex: 1/2:85   ZTEG12345678   F601   enable   working
+    """
     onus = []
     lines = output.split('\n')
     for line in lines:
         line = line.strip()
-        # Padrão: 1/2/2:85    ZTEG12345678    F601    enable    working
-        match = re.match(r'(\d+/\d+/\d+:\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(\S*)', line)
+        # Aceita SLOT/PON:ID ou SLOT/CARD/PORT:ID
+        match = re.match(r'(\d+/\d+(?:/\d+)?:\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(\S*)', line)
         if match and ':' in match.group(1):
             onus.append({
                 "onu_index": match.group(1),
@@ -478,38 +481,68 @@ def parse_onu_baseinfo(output: str) -> List[Dict]:
 
 
 def parse_uncfg_onus(output: str) -> List[Dict]:
-    """Parseia a saída de: show gpon onu uncfg"""
+    """Parseia: show gpon onu uncfg"""
     onus = []
     lines = output.split('\n')
     for line in lines:
         line = line.strip()
-        match = re.match(r'(gpon-onu_\d+/\d+/\d+:\d+)\s+(\S+)', line)
+        # gpon-onu_1/2:85  ou  gpon-onu_1/2/3:85
+        match = re.match(r'gpon-onu_(\d+/\d+(?:/\d+)?:\d+)\s+(\S+)', line)
         if match:
             onus.append({
-                "onu_index": match.group(1).replace("gpon-onu_", ""),
+                "onu_index": match.group(1),
                 "serial": match.group(2)
             })
+        else:
+            # Formato sem prefixo: 1/2:85  SERIAL
+            match2 = re.match(r'(\d+/\d+(?:/\d+)?:\d+)\s+(\S+)', line)
+            if match2:
+                onus.append({
+                    "onu_index": match2.group(1),
+                    "serial": match2.group(2)
+                })
     return onus
 
 
 def parse_olt_ports(output: str) -> List[Dict]:
-    """Parseia as portas PON disponíveis na OLT."""
+    """
+    Parseia interfaces gpon-olt da OLT.
+    Aceita formato de 2 partes: gpon-olt_SLOT/PON
+    Aceita formato de 3 partes: gpon-olt_SLOT/CARD/PORT (compatibilidade)
+    """
     ports = []
+    seen = set()
     lines = output.split('\n')
     for line in lines:
-        # Detecta linhas com portas gpon-olt
-        match = re.search(r'gpon-olt_(\d+)/(\d+)/(\d+)', line)
-        if match:
-            slot = int(match.group(1))
-            card = int(match.group(2))
-            port = int(match.group(3))
-            ports.append({
-                "slot": slot,
-                "card": card,
-                "port": port,
-                "port_type": "gpon",
-                "description": line.strip()
-            })
+        # Formato 2 partes: gpon-olt_1/2
+        m2 = re.search(r'gpon-olt_(\d+)/(\d+)(?!\s*/\s*\d)', line)
+        # Formato 3 partes: gpon-olt_1/2/3
+        m3 = re.search(r'gpon-olt_(\d+)/(\d+)/(\d+)', line)
+
+        if m3:
+            slot = int(m3.group(1))
+            pon = int(m3.group(3))  # usa a última parte como PON
+            key = (slot, pon)
+            if key not in seen:
+                seen.add(key)
+                ports.append({
+                    "slot": slot,
+                    "pon": pon,
+                    "port_type": "gpon",
+                    "description": line.strip()
+                })
+        elif m2:
+            slot = int(m2.group(1))
+            pon = int(m2.group(2))
+            key = (slot, pon)
+            if key not in seen:
+                seen.add(key)
+                ports.append({
+                    "slot": slot,
+                    "pon": pon,
+                    "port_type": "gpon",
+                    "description": line.strip()
+                })
     return ports
 
 
@@ -528,6 +561,16 @@ def parse_software_version(output: str) -> Dict:
 # ============================================================
 # FUNÇÕES DE ALTO NÍVEL
 # ============================================================
+
+def _olt_iface(slot: int, pon: int) -> str:
+    """Gera referência de interface OLT: gpon-olt_SLOT/PON"""
+    return f"gpon-olt_{slot}/{pon}"
+
+
+def _onu_iface(slot: int, pon: int, onu_id: int) -> str:
+    """Gera referência de ONU: gpon-onu_SLOT/PON:ONU_ID"""
+    return f"gpon-onu_{slot}/{pon}:{onu_id}"
+
 
 def test_olt_connection(ip: str, port: int, username: str, password: str, protocol: str) -> Tuple[bool, str]:
     """Testa a conexão com uma OLT. Retorna (sucesso, mensagem)."""
@@ -549,9 +592,10 @@ def test_olt_connection(ip: str, port: int, username: str, password: str, protoc
 def discover_olt_ports(ip: str, port: int, username: str, password: str, protocol: str) -> List[Dict]:
     """
     Descobre as portas PON disponíveis na OLT.
+    Sintaxe ZTE Titan: gpon-olt_SLOT/PON (2 partes)
     Estratégia:
-    1. Tenta 'show interface gpon-olt' para obter todas as interfaces de uma vez
-    2. Se não funcionar, faz varredura completa: slots 1-4, cards 1-4, portas 1-16
+    1. Tenta 'show interface gpon-olt' para listar todas de uma vez
+    2. Varredura: slots 1-4, PON 1-16
     """
     client = None
     try:
@@ -559,70 +603,60 @@ def discover_olt_ports(ip: str, port: int, username: str, password: str, protoco
         client.connect()
 
         ports = []
-        seen = set()  # evita duplicatas
+        seen = set()
 
-        # --- Estrategia 1: comandos que listam todas as interfaces de uma vez ---
-        commands_to_try = [
-            "show interface gpon-olt",
-            "show running-config interface gpon-olt",
-            "show gpon onu state",
-        ]
-
-        for cmd in commands_to_try:
+        # --- Estratégia 1: listar todas as interfaces de uma vez ---
+        for cmd in ["show interface gpon-olt", "show running-config interface gpon-olt"]:
             output = client.execute_command(cmd)
             found = parse_olt_ports(output)
             for p in found:
-                key = (p["slot"], p["card"], p["port"])
+                key = (p["slot"], p["pon"])
                 if key not in seen:
                     seen.add(key)
                     ports.append(p)
             if ports:
                 break
 
-        # --- Estrategia 2: varredura completa slot/card/port ---
-        # Sempre executa para garantir que nenhuma porta seja perdida
-        # Varre: slots 1-4, cards 1-4, portas 1-16
+        # --- Estratégia 2: varredura slot 1-4, PON 1-16 ---
         for slot in range(1, 5):
-            for card in range(1, 5):
-                for p in range(1, 17):
-                    key = (slot, card, p)
-                    if key in seen:
-                        continue
-                    iface = f"gpon-olt_{slot}/{card}/{p}"
-                    try:
-                        test_output = client.execute_command(
-                            f"show gpon onu state {iface}",
-                            timeout=8
-                        )
-                        # Considera valida se retornar dados de ONU ou prompt sem erro
-                        has_onus = bool(
-                            re.search(r'\d+/\d+/\d+:\d+', test_output) or
-                            "working" in test_output.lower() or
-                            "disable" in test_output.lower() or
-                            "initial" in test_output.lower()
-                        )
-                        # Tambem aceita portas vazias que existem (sem erro de "invalid")
-                        is_valid_iface = has_onus or (
-                            test_output.strip() != "" and
-                            "invalid" not in test_output.lower() and
-                            "error" not in test_output.lower() and
-                            "not exist" not in test_output.lower() and
-                            "no such" not in test_output.lower()
-                        )
-                        if is_valid_iface:
-                            seen.add(key)
-                            ports.append({
-                                "slot": slot,
-                                "card": card,
-                                "port": p,
-                                "port_type": "gpon",
-                                "description": iface
-                            })
-                    except Exception:
-                        pass
+            for pon in range(1, 17):
+                key = (slot, pon)
+                if key in seen:
+                    continue
+                iface = _olt_iface(slot, pon)
+                try:
+                    out = client.execute_command(
+                        f"show gpon onu state {iface}",
+                        timeout=8
+                    )
+                    # Porta válida: tem ONUs ou retornou sem erro
+                    has_onus = bool(
+                        re.search(r'\d+/\d+:\d+', out) or
+                        "working" in out.lower() or
+                        "disable" in out.lower() or
+                        "initial" in out.lower()
+                    )
+                    is_valid = has_onus or (
+                        out.strip() != "" and
+                        "invalid" not in out.lower() and
+                        "error" not in out.lower() and
+                        "not exist" not in out.lower() and
+                        "no such" not in out.lower() and
+                        "%" not in out  # ZTE usa % para erros
+                    )
+                    if is_valid:
+                        seen.add(key)
+                        ports.append({
+                            "slot": slot,
+                            "pon": pon,
+                            "port_type": "gpon",
+                            "description": iface
+                        })
+                except Exception:
+                    pass
 
-        # Ordena por slot, card, port
-        ports.sort(key=lambda x: (x["slot"], x["card"], x["port"]))
+        # Ordena por slot, pon
+        ports.sort(key=lambda x: (x["slot"], x["pon"]))
         return ports
 
     except Exception as e:
@@ -633,77 +667,23 @@ def discover_olt_ports(ip: str, port: int, username: str, password: str, protoco
 
 
 def get_pon_onu_status(ip: str, port: int, username: str, password: str, protocol: str,
-                       slot: int, pon_port: int) -> List[Dict]:
+                       slot: int, pon: int) -> List[Dict]:
     """Obtém o status de todas as ONUs de uma porta PON."""
     client = None
     try:
         client = get_olt_client(ip, port, username, password, protocol)
         client.connect()
-        cmd = f"show gpon onu state gpon-olt_{slot}/1/{pon_port}"
-        output = client.execute_command(cmd)
+        iface = _olt_iface(slot, pon)
+        output = client.execute_command(f"show gpon onu state {iface}")
+        client.disconnect()
         return parse_onu_state(output)
+    except OLTConnectionError:
+        raise
+    except Exception as e:
+        raise OLTConnectionError(f"Erro ao consultar ONUs: {str(e)}")
     finally:
         if client:
-            client.disconnect()
-
-
-def get_onu_full_info(ip: str, port: int, username: str, password: str, protocol: str,
-                      slot: int, pon_port: int, onu_id: int) -> Dict:
-    """Obtém informações completas de uma ONU específica."""
-    client = None
-    try:
-        client = get_olt_client(ip, port, username, password, protocol)
-        client.connect()
-
-        onu_ref = f"gpon-onu_{slot}/1/{pon_port}:{onu_id}"
-        olt_ref = f"gpon-olt_{slot}/1/{pon_port}"
-        onu_index = f"{slot}/1/{pon_port}:{onu_id}"
-
-        result = {}
-
-        # Estado
-        out = client.execute_command(f"show gpon onu state {onu_ref}")
-        states = parse_onu_state(out)
-        if states:
-            result["status"] = states[0]
-        else:
-            # Tenta pelo índice da OLT
-            out2 = client.execute_command(f"show gpon onu state {olt_ref}")
-            all_states = parse_onu_state(out2)
-            for s in all_states:
-                if s["onu_index"] == onu_index:
-                    result["status"] = s
-                    break
-
-        # Detalhes
-        out = client.execute_command(f"show gpon onu detail-info {onu_ref}")
-        result["detail"] = parse_onu_detail(out, onu_index)
-
-        # Potência
-        out = client.execute_command(f"show pon power attenuation {onu_ref}")
-        result["power"] = parse_onu_power(out, onu_index)
-
-        # Distância
-        out = client.execute_command(f"show gpon onu distance {onu_ref}")
-        result["distance"] = parse_onu_distance(out, onu_index)
-
-        # WAN
-        out = client.execute_command(f"show gpon remote-onu wan-info {onu_ref}")
-        result["wan"] = parse_onu_wan(out, onu_index)
-
-        # VoIP
-        out = client.execute_command(f"show gpon remote-onu voip-status {onu_ref}")
-        result["voip"] = parse_onu_voip(out, onu_index)
-
-        # Temperatura
-        out = client.execute_command(f"show gpon onu temperature {onu_ref}")
-        result["temperature"] = parse_onu_temperature(out, onu_index)
-
-        # Firmware
-        out = client.execute_command(f"show gpon onu firmware-version {onu_ref}")
-        result["firmware"] = parse_onu_firmware(out, onu_index)
-
-        return result
-    finally:
-        if client:
-            client.disconnect()
+            try:
+                client.disconnect()
+            except Exception:
+                pass

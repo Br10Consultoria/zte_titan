@@ -116,20 +116,21 @@ class RedisCache:
     # ============================================================
 
     @staticmethod
-    def key_pon_status(olt_id: int, slot: int, port: int) -> str:
-        return f"olt:{olt_id}:pon:{slot}:{port}:status"
+    def key_pon_status(olt_id: int, slot: int, pon: int, _unused: int = 1) -> str:
+        """Chave: olt:ID:pon:SLOT:PON:status"""
+        return f"olt:{olt_id}:pon:{slot}:{pon}:status"
 
     @staticmethod
-    def key_onu_detail(olt_id: int, slot: int, port: int, onu_id: int) -> str:
-        return f"olt:{olt_id}:onu:{slot}:{port}:{onu_id}:detail"
+    def key_onu_detail(olt_id: int, slot: int, pon: int, onu_id: int, _unused: int = 1) -> str:
+        return f"olt:{olt_id}:onu:{slot}:{pon}:{onu_id}:detail"
 
     @staticmethod
-    def key_onu_power(olt_id: int, slot: int, port: int, onu_id: int) -> str:
-        return f"olt:{olt_id}:onu:{slot}:{port}:{onu_id}:power"
+    def key_onu_power(olt_id: int, slot: int, pon: int, onu_id: int, _unused: int = 1) -> str:
+        return f"olt:{olt_id}:onu:{slot}:{pon}:{onu_id}:power"
 
     @staticmethod
-    def key_onu_full(olt_id: int, slot: int, port: int, onu_id: int) -> str:
-        return f"olt:{olt_id}:onu:{slot}:{port}:{onu_id}:full"
+    def key_onu_full(olt_id: int, slot: int, pon: int, onu_id: int, _unused: int = 1) -> str:
+        return f"olt:{olt_id}:onu:{slot}:{pon}:{onu_id}:full"
 
     @staticmethod
     def key_olt_ports(olt_id: int) -> str:
@@ -142,6 +143,19 @@ class RedisCache:
     @staticmethod
     def key_uncfg_onus(olt_id: int) -> str:
         return f"olt:{olt_id}:uncfg_onus"
+
+    def flush_all(self) -> int:
+        """Limpa TODO o cache Redis (usar com cuidado)."""
+        try:
+            client = self._get_client()
+            if not client:
+                return 0
+            keys = client.keys("olt:*")
+            if keys:
+                return client.delete(*keys)
+        except Exception as e:
+            print(f"Redis FLUSH error: {e}")
+        return 0
 
 
 cache = RedisCache()

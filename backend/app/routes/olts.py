@@ -9,7 +9,7 @@ from ..schemas import OLTCreate, OLTUpdate, OLTResponse, OLTPortResponse
 from ..auth import get_current_user, get_current_admin
 from ..olt_client import (
     test_olt_connection, discover_olt_ports, OLTConnectionError,
-    get_olt_client, parse_software_version
+    get_olt_client, parse_software_version, parse_onu_state, _olt_iface
 )
 from ..redis_client import cache
 
@@ -75,7 +75,6 @@ def update_olt(
 
     db.commit()
     db.refresh(olt)
-    # Invalida cache da OLT
     cache.delete_pattern(f"olt:{olt_id}:*")
     return olt
 
@@ -137,6 +136,11 @@ def discover_ports(
     current_user: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
+    """
+    Descobre as portas PON da OLT e salva no banco.
+    Sintaxe ZTE Titan: gpon-olt_SLOT/PON
+    Após descoberta, atualiza contagem de ONUs em background.
+    """
     olt = db.query(OLT).filter(OLT.id == olt_id).first()
     if not olt:
         raise HTTPException(status_code=404, detail="OLT não encontrada")
@@ -151,33 +155,87 @@ def discover_ports(
     # Remove portas antigas e insere as novas
     db.query(OLTPort).filter(OLTPort.olt_id == olt_id).delete()
 
-    saved_ports = []
     for p in ports:
         port_obj = OLTPort(
             olt_id=olt_id,
             slot=p["slot"],
-            card=p.get("card", 1),
-            port=p["port"],
+            pon=p["pon"],
             port_type=p.get("port_type", "gpon"),
-            description=p.get("description", ""),
+            description=p.get("description", _olt_iface(p["slot"], p["pon"])),
             status="unknown",
             onu_count=0
         )
         db.add(port_obj)
-        saved_ports.append(port_obj)
 
     olt.status = "online"
     olt.last_check = datetime.utcnow()
     db.commit()
 
-    # Invalida cache
+    # Invalida todo o cache da OLT
     cache.delete_pattern(f"olt:{olt_id}:*")
 
+    # Atualiza contagem de ONUs em background
+    background_tasks.add_task(
+        _update_ports_onu_count,
+        olt_id, olt.ip, olt.port, olt.username, olt.password, olt.protocol
+    )
+
     return {
-        "message": f"Descoberta concluída: {len(ports)} porta(s) PON encontrada(s)",
+        "message": f"Descoberta concluída: {len(ports)} porta(s) PON encontrada(s). Contagem de ONUs sendo atualizada...",
         "ports_found": len(ports),
-        "ports": [{"slot": p["slot"], "card": p.get("card", 1), "port": p["port"], "type": p.get("port_type", "gpon"), "interface": f"gpon-olt_{p['slot']}/{p.get('card',1)}/{p['port']}"} for p in ports]
+        "ports": [
+            {
+                "slot": p["slot"],
+                "pon": p["pon"],
+                "interface": _olt_iface(p["slot"], p["pon"]),
+                "type": p.get("port_type", "gpon")
+            }
+            for p in ports
+        ]
     }
+
+
+def _update_ports_onu_count(olt_id: int, ip: str, port: int, username: str, password: str, protocol: str):
+    """
+    Tarefa em background: conecta na OLT e atualiza status e contagem de ONUs
+    de cada porta PON descoberta.
+    """
+    from ..database import SessionLocal
+    from ..olt_client import get_olt_client, parse_onu_state, OLTConnectionError, _olt_iface
+
+    db = SessionLocal()
+    try:
+        ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).all()
+        if not ports:
+            return
+
+        client = get_olt_client(ip, port, username, password, protocol)
+        client.connect()
+
+        for p in ports:
+            iface = _olt_iface(p.slot, p.pon)
+            try:
+                out = client.execute_command(f"show gpon onu state {iface}", timeout=12)
+                onus = parse_onu_state(out)
+                p.onu_count = len(onus)
+                online = sum(1 for o in onus if o.get("oper_state") == "working")
+                if len(onus) > 0:
+                    p.status = "online"
+                elif out.strip():
+                    p.status = "active"  # porta existe mas sem ONUs
+                else:
+                    p.status = "unknown"
+            except Exception as ex:
+                print(f"[bg] Erro em {iface}: {ex}")
+                p.status = "unknown"
+
+        client.disconnect()
+        db.commit()
+        print(f"[bg] Contagem de ONUs atualizada para OLT {olt_id}")
+    except Exception as e:
+        print(f"[bg] Erro ao atualizar contagem de ONUs OLT {olt_id}: {e}")
+    finally:
+        db.close()
 
 
 @router.get("/{olt_id}/ports", response_model=List[OLTPortResponse])
@@ -190,7 +248,9 @@ def get_olt_ports(
     if not olt:
         raise HTTPException(status_code=404, detail="OLT não encontrada")
 
-    ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).all()
+    ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).order_by(
+        OLTPort.slot, OLTPort.pon
+    ).all()
     return ports
 
 
@@ -220,11 +280,9 @@ def get_olt_full_status(
 
         result = {"olt_id": olt_id, "name": olt.name, "ip": olt.ip}
 
-        # Software
         out = client.execute_command("show software")
         result["software"] = out[:1000]
 
-        # Uptime
         out = client.execute_command("show uptime")
         result["uptime"] = out[:500]
 

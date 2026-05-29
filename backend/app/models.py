@@ -8,14 +8,14 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(200), nullable=False)
     full_name = Column(String(100), nullable=True)
-    password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), default="viewer", nullable=False)  # admin ou viewer
-    totp_secret = Column(String(64), nullable=True)
-    is_2fa_enabled = Column(Boolean, default=False)
+    email = Column(String(100), nullable=True)
+    role = Column(String(20), default="viewer")  # admin | viewer
     is_active = Column(Boolean, default=True)
+    totp_secret = Column(String(32), nullable=True)
+    totp_enabled = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
@@ -26,15 +26,15 @@ class OLT(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     ip = Column(String(45), nullable=False)
-    port = Column(Integer, default=22)
+    port = Column(Integer, default=23)
     username = Column(String(50), nullable=False)
-    password = Column(String(255), nullable=False)
-    protocol = Column(String(10), default="ssh")  # ssh, telnet, snmp
-    snmp_community = Column(String(100), nullable=True)
+    password = Column(String(100), nullable=False)
+    protocol = Column(String(10), default="telnet")  # telnet | ssh
+    snmp_community = Column(String(50), nullable=True)
     snmp_version = Column(String(5), default="2c")
-    status = Column(String(20), default="unknown")  # online, offline, unknown
+    status = Column(String(20), default="unknown")
     model = Column(String(50), nullable=True)
-    firmware = Column(String(100), nullable=True)
+    firmware = Column(String(50), nullable=True)
     last_check = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -42,13 +42,17 @@ class OLT(Base):
 
 
 class OLTPort(Base):
+    """
+    Representa uma porta PON da OLT.
+    Sintaxe ZTE Titan: gpon-olt_SLOT/PON (2 partes)
+    Exemplo: gpon-olt_1/2 → slot=1, pon=2
+    """
     __tablename__ = "olt_ports"
 
     id = Column(Integer, primary_key=True, index=True)
     olt_id = Column(Integer, ForeignKey("olts.id"), nullable=False)
     slot = Column(Integer, nullable=False)
-    card = Column(Integer, default=1, nullable=False)  # subslot (gpon-olt_SLOT/CARD/PORT)
-    port = Column(Integer, nullable=False)
+    pon = Column(Integer, nullable=False)   # número da porta PON (gpon-olt_SLOT/PON)
     port_type = Column(String(20), default="gpon")
     description = Column(String(200), nullable=True)
     status = Column(String(20), default="unknown")
@@ -63,9 +67,8 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    username = Column(String(50), nullable=True)
     action = Column(String(100), nullable=False)
-    resource = Column(String(200), nullable=True)
-    ip_address = Column(String(45), nullable=True)
+    resource = Column(String(100), nullable=True)
     details = Column(Text, nullable=True)
+    ip_address = Column(String(45), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
