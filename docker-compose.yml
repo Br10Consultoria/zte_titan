@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # ============================================================
+  # Redis - Cache de 24 horas para consultas OLT
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: zte_titan_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - zte_network
+
+  # ============================================================
+  # Backend - FastAPI + SQLite
+  # ============================================================
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: zte_titan_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-zte-titan-change-this-secret-key-in-production}
+      - DATABASE_URL=sqlite:////app/data/zte_titan.db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CACHE_TTL=86400
+      - ACCESS_TOKEN_EXPIRE_MINUTES=480
+      - SSH_TIMEOUT=30
+      - SSH_COMMAND_TIMEOUT=60
+    volumes:
+      - app_data:/app/data
+      - ./frontend:/app/frontend:ro
+    depends_on:
+      - redis
+    networks:
+      - zte_network
+
+volumes:
+  redis_data:
+    driver: local
+  app_data:
+    driver: local
+
+networks:
+  zte_network:
+    driver: bridge
