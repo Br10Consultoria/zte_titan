@@ -1,7 +1,6 @@
 import re
 import time
 import socket
-import telnetlib
 import paramiko
 from typing import Optional, List, Dict, Any, Tuple
 from .config import settings
@@ -9,6 +8,98 @@ from .config import settings
 
 class OLTConnectionError(Exception):
     pass
+
+
+# ============================================================
+# Implementação própria de Telnet (telnetlib foi removido no Python 3.13)
+# ============================================================
+class SimpleTelnet:
+    """Cliente Telnet simples via socket puro, compatível com Python 3.13+."""
+
+    IAC  = bytes([255])
+    DONT = bytes([254])
+    DO   = bytes([253])
+    WONT = bytes([252])
+    WILL = bytes([251])
+
+    def __init__(self, host: str, port: int, timeout: int = 30):
+        self.host = host
+        self.port = port
+        self.timeout = timeout
+        self.sock = None
+        self._buf = b""
+
+    def open(self):
+        self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+        self.sock.settimeout(self.timeout)
+
+    def _recv_raw(self, size: int = 4096) -> bytes:
+        try:
+            return self.sock.recv(size)
+        except socket.timeout:
+            return b""
+
+    def _process_iac(self, data: bytes) -> bytes:
+        """Remove negociações IAC do stream Telnet."""
+        out = b""
+        i = 0
+        while i < len(data):
+            if data[i:i+1] == self.IAC:
+                if i + 2 < len(data):
+                    cmd = data[i+1:i+2]
+                    opt = data[i+2:i+3]
+                    # Responde WONT para DO e DONT para WILL
+                    if cmd == self.DO:
+                        self.sock.sendall(self.IAC + self.WONT + opt)
+                    elif cmd == self.WILL:
+                        self.sock.sendall(self.IAC + self.DONT + opt)
+                    i += 3
+                else:
+                    i += 1
+            else:
+                out += data[i:i+1]
+                i += 1
+        return out
+
+    def read_until(self, expected: bytes, timeout: int = 10) -> bytes:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            raw = self._recv_raw()
+            if raw:
+                self._buf += self._process_iac(raw)
+            if expected in self._buf:
+                idx = self._buf.index(expected) + len(expected)
+                result = self._buf[:idx]
+                self._buf = self._buf[idx:]
+                return result
+            time.sleep(0.1)
+        return self._buf
+
+    def read_very_eager(self) -> bytes:
+        self.sock.settimeout(0.3)
+        try:
+            raw = self.sock.recv(8192)
+            if raw:
+                result = self._process_iac(raw)
+                self._buf += result
+        except socket.timeout:
+            pass
+        finally:
+            self.sock.settimeout(self.timeout)
+        out = self._buf
+        self._buf = b""
+        return out
+
+    def write(self, data: bytes):
+        self.sock.sendall(data)
+
+    def close(self):
+        if self.sock:
+            try:
+                self.sock.close()
+            except Exception:
+                pass
+            self.sock = None
 
 
 class OLTSSHClient:
@@ -130,7 +221,8 @@ class OLTTelnetClient:
 
     def connect(self):
         try:
-            self.tn = telnetlib.Telnet(self.ip, self.port, timeout=settings.SSH_TIMEOUT)
+            self.tn = SimpleTelnet(self.ip, self.port, timeout=settings.SSH_TIMEOUT)
+            self.tn.open()
             # Login
             self.tn.read_until(b"Username:", timeout=10)
             self.tn.write(self.username.encode("ascii") + b"\n")
@@ -140,6 +232,8 @@ class OLTTelnetClient:
             output = self.tn.read_until(b"#", timeout=10).decode("utf-8", errors="replace")
             if "#" not in output and ">" not in output:
                 raise OLTConnectionError("Login Telnet falhou - prompt não encontrado")
+        except OLTConnectionError:
+            raise
         except Exception as e:
             raise OLTConnectionError(f"Falha ao conectar via Telnet em {self.ip}:{self.port} - {str(e)}")
 
