@@ -95,22 +95,24 @@ ok "Ambiente virtual criado em $VENV_DIR"
 # 5. INSTALAR DEPENDÊNCIAS PYTHON
 # ============================================================
 info "Instalando dependências Python (pode demorar alguns minutos)..."
-"$VENV_DIR/bin/pip" install --quiet --upgrade pip
+"$VENV_DIR/bin/pip" install --quiet --upgrade pip setuptools wheel
+
+# Instala dependências sem versões fixas para compatibilidade com Python 3.13+
 "$VENV_DIR/bin/pip" install --quiet \
-    "fastapi==0.111.0" \
-    "uvicorn[standard]==0.29.0" \
-    "sqlalchemy==2.0.30" \
-    "python-jose[cryptography]==3.3.0" \
-    "passlib[bcrypt]==1.7.4" \
-    "bcrypt==4.0.1" \
-    "python-multipart==0.0.9" \
-    "pyotp==2.9.0" \
-    "qrcode[pil]==7.4.2" \
-    "redis==5.0.4" \
-    "paramiko==3.4.0" \
-    "aiofiles==23.2.1" \
-    "python-dotenv==1.0.1" \
-    "Pillow==10.3.0"
+    "fastapi" \
+    "uvicorn[standard]" \
+    "sqlalchemy" \
+    "python-jose[cryptography]" \
+    "passlib[bcrypt]" \
+    "bcrypt>=4.2.0" \
+    "python-multipart" \
+    "pyotp" \
+    "qrcode[pil]" \
+    "redis" \
+    "paramiko" \
+    "aiofiles" \
+    "python-dotenv" \
+    "Pillow"
 ok "Dependências Python instaladas"
 
 # ============================================================
