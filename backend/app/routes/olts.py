@@ -176,7 +176,7 @@ def discover_ports(
     return {
         "message": f"Descoberta concluída: {len(ports)} porta(s) PON encontrada(s)",
         "ports_found": len(ports),
-        "ports": [{"slot": p["slot"], "port": p["port"], "type": p.get("port_type", "gpon")} for p in ports]
+        "ports": [{"slot": p["slot"], "card": p.get("card", 1), "port": p["port"], "type": p.get("port_type", "gpon"), "interface": f"gpon-olt_{p['slot']}/{p.get('card',1)}/{p['port']}"} for p in ports]
     }
 
 

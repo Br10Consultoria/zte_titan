@@ -547,40 +547,84 @@ def test_olt_connection(ip: str, port: int, username: str, password: str, protoc
 
 
 def discover_olt_ports(ip: str, port: int, username: str, password: str, protocol: str) -> List[Dict]:
-    """Descobre as portas PON disponíveis na OLT."""
+    """
+    Descobre as portas PON disponíveis na OLT.
+    Estratégia:
+    1. Tenta 'show interface gpon-olt' para obter todas as interfaces de uma vez
+    2. Se não funcionar, faz varredura completa: slots 1-4, cards 1-4, portas 1-16
+    """
     client = None
     try:
         client = get_olt_client(ip, port, username, password, protocol)
         client.connect()
 
-        # Tenta diferentes comandos para listar portas
         ports = []
+        seen = set()  # evita duplicatas
+
+        # --- Estrategia 1: comandos que listam todas as interfaces de uma vez ---
         commands_to_try = [
             "show interface gpon-olt",
             "show running-config interface gpon-olt",
+            "show gpon onu state",
         ]
 
         for cmd in commands_to_try:
             output = client.execute_command(cmd)
-            ports = parse_olt_ports(output)
+            found = parse_olt_ports(output)
+            for p in found:
+                key = (p["slot"], p["card"], p["port"])
+                if key not in seen:
+                    seen.add(key)
+                    ports.append(p)
             if ports:
                 break
 
-        # Se não encontrou, tenta descoberta por força bruta (slots 1-4, ports 1-16)
-        if not ports:
-            for slot in range(1, 5):
+        # --- Estrategia 2: varredura completa slot/card/port ---
+        # Sempre executa para garantir que nenhuma porta seja perdida
+        # Varre: slots 1-4, cards 1-4, portas 1-16
+        for slot in range(1, 5):
+            for card in range(1, 5):
                 for p in range(1, 17):
-                    test_output = client.execute_command(f"show gpon onu baseinfo gpon-olt_{slot}/1/{p}")
-                    if "gpon-onu" in test_output.lower() or re.search(r'\d+/\d+/\d+:\d+', test_output):
-                        ports.append({
-                            "slot": slot,
-                            "card": 1,
-                            "port": p,
-                            "port_type": "gpon",
-                            "description": f"GPON Slot {slot} Port {p}"
-                        })
+                    key = (slot, card, p)
+                    if key in seen:
+                        continue
+                    iface = f"gpon-olt_{slot}/{card}/{p}"
+                    try:
+                        test_output = client.execute_command(
+                            f"show gpon onu state {iface}",
+                            timeout=8
+                        )
+                        # Considera valida se retornar dados de ONU ou prompt sem erro
+                        has_onus = bool(
+                            re.search(r'\d+/\d+/\d+:\d+', test_output) or
+                            "working" in test_output.lower() or
+                            "disable" in test_output.lower() or
+                            "initial" in test_output.lower()
+                        )
+                        # Tambem aceita portas vazias que existem (sem erro de "invalid")
+                        is_valid_iface = has_onus or (
+                            test_output.strip() != "" and
+                            "invalid" not in test_output.lower() and
+                            "error" not in test_output.lower() and
+                            "not exist" not in test_output.lower() and
+                            "no such" not in test_output.lower()
+                        )
+                        if is_valid_iface:
+                            seen.add(key)
+                            ports.append({
+                                "slot": slot,
+                                "card": card,
+                                "port": p,
+                                "port_type": "gpon",
+                                "description": iface
+                            })
+                    except Exception:
+                        pass
 
+        # Ordena por slot, card, port
+        ports.sort(key=lambda x: (x["slot"], x["card"], x["port"]))
         return ports
+
     except Exception as e:
         raise OLTConnectionError(f"Falha na descoberta: {str(e)}")
     finally:
