@@ -23,8 +23,12 @@ from ..redis_client import cache
 
 
 def _olt_iface(slot: int, card: int, pon: int) -> str:
-    """Gera referência de porta PON: gpon-olt_SLOT/CARD/PON (definida localmente para evitar cache de .pyc)"""
-    return f"gpon-olt_{slot}/{card}/{pon}"
+    """
+    Gera referência de porta PON no formato ZTE C320: gpon-olt_RACK/SLOT/PON
+    RACK=1 fixo, SLOT=número da placa (card), PON=porta
+    Exemplo: card=1, pon=3 → gpon-olt_1/1/3 | card=2, pon=5 → gpon-olt_1/2/5
+    """
+    return f"gpon-olt_1/{card}/{pon}"
 
 router = APIRouter(prefix="/olts", tags=["OLTs"])
 logger = logging.getLogger("routes.olts")

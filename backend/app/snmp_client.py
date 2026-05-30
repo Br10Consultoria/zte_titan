@@ -54,8 +54,10 @@ def _find_snmp_tool(name: str) -> Optional[str]:
 def _decode_zte_index(if_index: int, base: int) -> Tuple[int, int]:
     """
     Converte ifIndex ZTE para (slot, pon) usando a base detectada.
-    slot = (if_index - base) // 65536 + 1
-    pon  = ((if_index - base) % 65536) // 256 + 1
+    Na ZTE C320/C600, o formato da CLI é gpon-olt_RACK/SLOT/PON onde RACK=1 fixo.
+    O ifIndex codifica o SLOT (placa) e a PON:
+      slot = (if_index - base) // 65536 + 1  → número da placa (1, 2, ...)
+      pon  = ((if_index - base) % 65536) // 256 + 1  → porta PON (1-16)
     """
     diff = if_index - base
     slot = diff // ZTE_SLOT_STEP + 1
@@ -313,12 +315,16 @@ def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
         if not (1 <= slot <= 16 and 1 <= pon_num <= 16):
             continue
 
+        # Formato CLI ZTE: gpon-olt_RACK/SLOT/PON onde RACK=1 fixo
+        # slot aqui = número da placa (1=slot1, 2=slot2)
+        # Na CLI: gpon-olt_1/1/1 (placa 1, porta 1) e gpon-olt_1/2/1 (placa 2, porta 1)
         pon_ports.append({
-            "slot":      slot,
-            "card":      1,      # Será atualizado abaixo se SSH disponível
+            "rack":      1,       # RACK fixo = 1
+            "slot":      slot,    # número da placa (1 ou 2)
+            "card":      1,       # rack=1, slot=placa → montagem: gpon-olt_1/{slot}/{pon}
             "pon":       pon_num,
             "if_index":  if_index,
-            "if_name":   f"gpon-olt_{slot}/1/{pon_num}",  # Provisório
+            "if_name":   f"gpon-olt_1/{slot}/{pon_num}",  # Formato correto ZTE
             "port_type": "gpon",
             "description": val if val else f"OLT-{pon_num}",
             "status":    "unknown",
@@ -336,33 +342,15 @@ def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
     # -------------------------------------------------------
     # Detecta o card real via SSH para cada slot único
     # -------------------------------------------------------
-    if ssh_username and ssh_port and ssh_protocol:
-        logger.info(f"[SNMP] Detectando card real via SSH para {len(pon_ports)} portas...")
-        # Agrupa por slot para fazer apenas uma detecção por slot
-        slot_card_map = {}
-        slots_seen = set()
-        for p in pon_ports:
-            slot = p["slot"]
-            if slot not in slots_seen:
-                slots_seen.add(slot)
-                # Usa a primeira porta do slot para detectar o card
-                card = _detect_card_via_ssh(
-                    host, ssh_port, ssh_username, ssh_password, ssh_protocol,
-                    slot, p["pon"]
-                )
-                slot_card_map[slot] = card
-                logger.info(f"[SNMP] Slot {slot} → card={card}")
-
-        # Atualiza card e if_name em todas as portas
-        for p in pon_ports:
-            card = slot_card_map.get(p["slot"], 1)
-            p["card"] = card
-            p["if_name"] = f"gpon-olt_{p['slot']}/{card}/{p['pon']}"
-    else:
-        logger.warning(
-            "[SNMP] SSH não configurado — card será detectado como 1. "
-            "Forneça ssh_username para detecção automática do card."
-        )
+    # Formato correto ZTE: gpon-olt_1/SLOT/PON (rack=1 fixo, slot=número da placa)
+    # Não é necessário detectar card via SSH — o slot JÁ é o número correto da placa
+    # Exemplo: slot=1 → gpon-olt_1/1/1..16, slot=2 → gpon-olt_1/2/1..16
+    logger.info(f"[SNMP] Usando formato ZTE correto: gpon-olt_1/SLOT/PON (rack=1 fixo)")
+    for p in pon_ports:
+        slot = p["slot"]
+        pon  = p["pon"]
+        p["card"] = slot   # card = slot da placa (para compatibilidade com o banco)
+        p["if_name"] = f"gpon-olt_1/{slot}/{pon}"
 
     # Busca contagem de ONUs por porta via SNMP
     try:

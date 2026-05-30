@@ -355,13 +355,22 @@ def get_olt_client(ip: str, port: int, username: str, password: str, protocol: s
 
 
 def _olt_iface(slot: int, card: int, pon: int) -> str:
-    """Gera referência de porta PON: gpon-olt_SLOT/CARD/PON"""
-    return f"gpon-olt_{slot}/{card}/{pon}"
+    """
+    Gera referência de porta PON no formato ZTE C320: gpon-olt_RACK/SLOT/PON
+    RACK = 1 (fixo), SLOT = número da placa (card), PON = porta
+    Exemplo: slot=1, card=1, pon=3 → gpon-olt_1/1/3
+             slot=1, card=2, pon=5 → gpon-olt_1/2/5
+    """
+    return f"gpon-olt_1/{card}/{pon}"
 
 
 def _onu_iface(slot: int, card: int, pon: int, onu_id: int) -> str:
-    """Gera referência de ONU: gpon-onu_SLOT/CARD/PON:ONU_ID"""
-    return f"gpon-onu_{slot}/{card}/{pon}:{onu_id}"
+    """
+    Gera referência de ONU no formato ZTE C320: gpon-onu_RACK/SLOT/PON:ID
+    RACK = 1 (fixo), SLOT = número da placa (card), PON = porta
+    Exemplo: slot=1, card=2, pon=2, onu_id=85 → gpon-onu_1/2/2:85
+    """
+    return f"gpon-onu_1/{card}/{pon}:{onu_id}"
 
 
 # ============================================================
