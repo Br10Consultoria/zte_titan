@@ -14,12 +14,17 @@ from ..schemas import OLTCreate, OLTUpdate, OLTResponse, OLTPortResponse
 from ..auth import get_current_user, get_current_admin
 from ..olt_client import (
     test_olt_connection, discover_olt_ports, OLTConnectionError,
-    get_olt_client, parse_software_version, parse_onu_state, _olt_iface
+    get_olt_client, parse_software_version, parse_onu_state
 )
 from ..snmp_client import (
     snmp_discover_pon_ports, snmp_get_system_info, snmp_test_connection, SNMPError
 )
 from ..redis_client import cache
+
+
+def _olt_iface(slot: int, card: int, pon: int) -> str:
+    """Gera referência de porta PON: gpon-olt_SLOT/CARD/PON (definida localmente para evitar cache de .pyc)"""
+    return f"gpon-olt_{slot}/{card}/{pon}"
 
 router = APIRouter(prefix="/olts", tags=["OLTs"])
 logger = logging.getLogger("routes.olts")
