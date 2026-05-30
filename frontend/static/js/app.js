@@ -346,8 +346,8 @@ function app() {
     openONUsByPort(olt, port) {
       this.onuFilter.olt_id = String(olt.id);
       this.loadOLTPortsForFilter();
-      // Formato: portId|slot|pon  (sintaxe ZTE: gpon-olt_SLOT/PON)
-      this.onuFilter.port_id = `${port.id}|${port.slot}|${port.pon}`;
+      // Formato: portId|slot|card|pon  (sintaxe ZTE: gpon-olt_SLOT/CARD/PON)
+      this.onuFilter.port_id = `${port.id}|${port.slot}|${port.card || 1}|${port.pon}`;
       this.setPage('onus');
       this.loadONUStatus(false);
     },
@@ -371,17 +371,20 @@ function app() {
     // ============================================================
     async loadONUStatus(forceRefresh = false) {
       if (!this.onuFilter.port_id) return;
-      // Formato: portId|slot|pon
-      const [, slot, pon] = this.onuFilter.port_id.split('|');
+      // Formato: portId|slot|card|pon
+      const parts = this.onuFilter.port_id.split('|');
+      const slot = parts[1];
+      const card = parts[2] || '1';
+      const pon  = parts[3] || parts[2]; // fallback para formato antigo portId|slot|pon
       const oltId = this.onuFilter.olt_id;
 
       this.onuLoading = true;
       this.onuStatusData = null;
       try {
         const url = forceRefresh
-          ? `/onus/${oltId}/pon/${slot}/${pon}/status?force_refresh=true`
-          : `/onus/${oltId}/pon/${slot}/${pon}/status`;
-        const res = await this.apiGet(url.replace('/api', ''));
+          ? `/onus/${oltId}/pon/${slot}/${card}/${pon}/status?force_refresh=true`
+          : `/onus/${oltId}/pon/${slot}/${card}/${pon}/status`;
+        const res = await this.apiGet(url);
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.detail || 'Erro ao consultar ONUs');
@@ -412,32 +415,35 @@ function app() {
 
     async openONUDetail(onu) {
       if (!this.onuFilter.port_id) return;
-      // Formato: portId|slot|pon
-      const [, slot, pon] = this.onuFilter.port_id.split('|');
-      const onuId = onu.onu_index.split(':')[1];
-      this.onuDetailContext = { oltId: this.onuFilter.olt_id, slot, pon, onuId };
+      // Formato: portId|slot|card|pon
+      const parts = this.onuFilter.port_id.split('|');
+      const slot = parts[1];
+      const card = parts[2] || '1';
+      const pon  = parts[3] || parts[2];
+      const onuId = onu.onu_index.split(':').pop();
+      this.onuDetailContext = { oltId: this.onuFilter.olt_id, slot, card, pon, onuId };
       this.onuDetailModal = true;
-      this.detailTab = 'status';
+      this.detailTab = 'info';
       await this.fetchONUDetail(false);
     },
 
     async openONUDetailFromSearch(r) {
-      const onuId = r.onu_index.split(':')[1];
-      this.onuDetailContext = { oltId: this.searchOltId, slot: r.slot, pon: r.pon, onuId };
+      const onuId = r.onu_index.split(':').pop();
+      this.onuDetailContext = { oltId: this.searchOltId, slot: r.slot, card: r.card || 1, pon: r.pon, onuId };
       this.onuDetailModal = true;
-      this.detailTab = 'status';
+      this.detailTab = 'info';
       await this.fetchONUDetail(false);
     },
 
     async fetchONUDetail(forceRefresh) {
       if (!this.onuDetailContext) return;
-      const { oltId, slot, pon, onuId } = this.onuDetailContext;
+      const { oltId, slot, card, pon, onuId } = this.onuDetailContext;
       this.onuDetailLoading = true;
       this.onuDetailData = null;
       try {
         const path = forceRefresh
-          ? `/onus/${oltId}/pon/${slot}/${pon}/onu/${onuId}/full?force_refresh=true`
-          : `/onus/${oltId}/pon/${slot}/${pon}/onu/${onuId}/full`;
+          ? `/onus/${oltId}/pon/${slot}/${card}/${pon}/onu/${onuId}/full?force_refresh=true`
+          : `/onus/${oltId}/pon/${slot}/${card}/${pon}/onu/${onuId}/full`;
         const res = await fetch(`${API_BASE}${path}`, {
           headers: { 'Authorization': `Bearer ${this.getToken()}` }
         });

@@ -121,7 +121,8 @@ class OLTPortResponse(BaseModel):
     id: int
     olt_id: int
     slot: int
-    pon: int          # porta PON: gpon-olt_SLOT/PON
+    card: int = 1     # subslot/card: gpon-olt_SLOT/CARD/PON
+    pon: int          # porta PON
     port_type: str
     description: Optional[str] = None
     status: str

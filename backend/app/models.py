@@ -9,13 +9,13 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
-    password_hash = Column(String(200), nullable=False)   # usado em auth.py como user.password_hash
+    password_hash = Column(String(200), nullable=False)
     full_name = Column(String(100), nullable=True)
     email = Column(String(100), nullable=True)
     role = Column(String(20), default="viewer")           # admin | viewer
     is_active = Column(Boolean, default=True)
     totp_secret = Column(String(32), nullable=True)
-    is_2fa_enabled = Column(Boolean, default=False)       # usado em auth.py como user.is_2fa_enabled
+    is_2fa_enabled = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
@@ -30,7 +30,7 @@ class OLT(Base):
     username = Column(String(50), nullable=False)
     password = Column(String(100), nullable=False)
     protocol = Column(String(10), default="telnet")       # telnet | ssh
-    snmp_community = Column(String(50), nullable=True)
+    snmp_community = Column(String(50), nullable=True, default="public")
     snmp_version = Column(String(5), default="2c")
     status = Column(String(20), default="unknown")
     model = Column(String(50), nullable=True)
@@ -44,15 +44,16 @@ class OLT(Base):
 class OLTPort(Base):
     """
     Representa uma porta PON da OLT.
-    Sintaxe ZTE Titan: gpon-olt_SLOT/PON (2 partes)
-    Exemplo: gpon-olt_1/2 → slot=1, pon=2
+    Sintaxe ZTE Titan: gpon-olt_SLOT/CARD/PON (3 partes)
+    Exemplo: gpon-olt_1/2/3 → slot=1, card=2, pon=3
     """
     __tablename__ = "olt_ports"
 
     id = Column(Integer, primary_key=True, index=True)
     olt_id = Column(Integer, ForeignKey("olts.id"), nullable=False)
     slot = Column(Integer, nullable=False)
-    pon = Column(Integer, nullable=False)    # número da porta PON (gpon-olt_SLOT/PON)
+    card = Column(Integer, nullable=False, default=1)    # subslot/card (ex: 2 em gpon-olt_1/2/3)
+    pon = Column(Integer, nullable=False)                # número da porta PON
     port_type = Column(String(20), default="gpon")
     description = Column(String(200), nullable=True)
     status = Column(String(20), default="unknown")
@@ -67,7 +68,7 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    username = Column(String(50), nullable=True)          # usado em routes/auth.py
+    username = Column(String(50), nullable=True)
     action = Column(String(100), nullable=False)
     resource = Column(String(100), nullable=True)
     details = Column(Text, nullable=True)
