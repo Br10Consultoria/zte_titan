@@ -1,43 +1,37 @@
 """
-SNMP Client para ZTE Titan (C320/C600/C610/C620/C650)
-Usa subprocess com snmpwalk/snmpget do sistema operacional.
+SNMP Client para ZTE Titan — descoberta de portas PON via snmpwalk/snmpget do sistema.
 
-OIDs proprietárias ZTE:
-  3902.1012.3.13.1.1.1   - Lista de portas PON (discovery)
-  3902.1012.3.13.1.1.13  - Contagem de ONUs por porta
-  3902.1015.3.1.13.1.12  - Temperatura SFP por porta
-  3902.1015.3.1.13.1.4   - Potência laser TX por porta
+A OLT ZTE C320/C600 retorna ifDescr vazio para interfaces PON.
+Usa a OID proprietária ZTE para descobrir as portas:
+  1.3.6.1.4.1.3902.1012.3.13.1.1.1  — nome da porta PON (ex: "OLT-1")
+  1.3.6.1.4.1.3902.1012.3.13.1.1.13 — contagem de ONUs por porta
+  1.3.6.1.2.1.2.2.1.8               — ifOperStatus (1=up, 2=down)
+  1.3.6.1.2.1.1.1.0                 — sysDescr (modelo/firmware)
 
-Codificação do ifIndex ZTE C320:
-  Os índices são blocos de 65536 por slot e 256 por pon.
-  A base varia por modelo/firmware — detectamos automaticamente
-  a partir do menor índice retornado pelo snmpwalk.
+O ifIndex ZTE codifica slot e pon:
+  slot = (if_index - base) // 65536 + 1
+  pon  = ((if_index - base) % 65536) // 256 + 1
 
-  slot = (idx - base) // 65536 + 1
-  pon  = ((idx - base) % 65536) // 256 + 1
-
-Instalação no servidor:
-  apt-get install -y snmp
+O campo 'card' (subslot) NÃO é detectável via SNMP na ZTE C320.
+Ele é detectado via SSH/Telnet após a descoberta SNMP.
 """
-import re
 import subprocess
-import shutil
-from typing import List, Dict, Optional, Tuple
+import re
+import logging
+from typing import List, Dict, Tuple, Optional
 
-# OIDs ZTE proprietárias
-OID_ZTE_PON_NAME      = "1.3.6.1.4.1.3902.1012.3.13.1.1.1"   # Nome da porta
-OID_ZTE_PON_ONU_COUNT = "1.3.6.1.4.1.3902.1012.3.13.1.1.13"  # Qtd ONUs por porta
-OID_ZTE_PON_TEMP      = "1.3.6.1.4.1.3902.1015.3.1.13.1.12"  # Temperatura SFP
-OID_ZTE_PON_TX_POWER  = "1.3.6.1.4.1.3902.1015.3.1.13.1.4"   # Potência laser TX
+logger = logging.getLogger("snmp_client")
 
-# OIDs padrão MIB-II
+# Constantes ZTE
+ZTE_SLOT_STEP = 65536   # 0x10000
+ZTE_PON_STEP  = 256     # 0x100
+
+# OIDs
+OID_ZTE_PON_NAME      = "1.3.6.1.4.1.3902.1012.3.13.1.1.1"
+OID_ZTE_PON_ONU_COUNT = "1.3.6.1.4.1.3902.1012.3.13.1.1.13"
+OID_IF_OPER_STATUS    = "1.3.6.1.2.1.2.2.1.8"
 OID_SYS_DESCR         = "1.3.6.1.2.1.1.1.0"
 OID_SYS_NAME          = "1.3.6.1.2.1.1.5.0"
-OID_IF_OPER_STATUS    = "1.3.6.1.2.1.2.2.1.8"
-
-# Passo entre PONs e entre slots (constante em todos os modelos ZTE)
-ZTE_PON_STEP  = 256    # 0x100
-ZTE_SLOT_STEP = 65536  # 0x10000
 
 
 class SNMPError(Exception):
@@ -45,7 +39,8 @@ class SNMPError(Exception):
 
 
 def _find_snmp_tool(name: str) -> Optional[str]:
-    """Localiza o binário snmpwalk/snmpget no sistema."""
+    """Localiza o binário snmpwalk/snmpget no PATH do sistema."""
+    import shutil
     path = shutil.which(name)
     if path:
         return path
@@ -119,18 +114,19 @@ def _snmp_walk(host: str, community: str, oid: str, port: int = 161,
         full_oid = parts[0].strip()
         raw_val  = parts[1].strip()
 
-        # Remove tipo (STRING:, INTEGER:, Hex-STRING:, etc.)
-        val = re.sub(r'^\w[\w-]*:\s*', '', raw_val).strip().strip('"').strip()
-
-        # Extrai o último número do OID (sempre é o índice)
-        oid_numbers = re.findall(r'\d+', full_oid)
-        if not oid_numbers:
+        # Extrai o último número do OID como índice
+        m = re.search(r'\.(\d+)\s*$', full_oid)
+        if not m:
             continue
+        idx = int(m.group(1))
 
-        try:
-            idx = int(oid_numbers[-1])
-        except ValueError:
-            continue
+        # Limpa o valor (remove tipo SNMP: STRING: "...", INTEGER: ..., etc.)
+        val = raw_val
+        for prefix in ["STRING:", "INTEGER:", "Gauge32:", "Counter32:", "OID:", "IpAddress:", "Timeticks:"]:
+            if val.startswith(prefix):
+                val = val[len(prefix):].strip()
+                break
+        val = val.strip('"').strip()
 
         rows.append((idx, val))
 
@@ -138,86 +134,126 @@ def _snmp_walk(host: str, community: str, oid: str, port: int = 161,
 
 
 def _snmp_get(host: str, community: str, oid: str, port: int = 161,
-              version: str = "2c", timeout: int = 5) -> Optional[str]:
-    """Executa snmpget via subprocess. Retorna o valor como string ou None."""
+              version: str = "2c", timeout: int = 10) -> Optional[str]:
+    """Executa snmpget e retorna o valor como string."""
     tool = _find_snmp_tool("snmpget")
     if not tool:
-        raise SNMPError("snmpget não encontrado. Instale com: apt-get install -y snmp")
+        return None
 
     cmd = [
         tool,
         "-v", version,
         "-c", community,
         "-t", str(timeout),
-        "-r", "1",
+        "-r", "2",
         f"{host}:{port}",
         oid
     ]
 
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout + 3
+            cmd, capture_output=True, text=True, timeout=timeout + 5
         )
-    except subprocess.TimeoutExpired:
-        raise SNMPError(f"Timeout ao executar snmpget em {host}:{port}")
-    except FileNotFoundError:
-        raise SNMPError("snmpget não encontrado. Instale com: apt-get install -y snmp")
+        if result.returncode != 0 or not result.stdout.strip():
+            return None
 
-    if result.returncode != 0:
-        raise SNMPError(f"snmpget falhou: {result.stderr.strip()[:200]}")
+        line = result.stdout.strip()
+        if '=' not in line:
+            return None
 
-    line = result.stdout.strip()
-    if '=' not in line:
-        return line if line else None
+        val = line.split('=', 1)[1].strip()
+        for prefix in ["STRING:", "INTEGER:", "Gauge32:", "OctetString:"]:
+            if val.startswith(prefix):
+                val = val[len(prefix):].strip()
+                break
+        return val.strip('"').strip()
+    except Exception:
+        return None
 
-    val = line.split('=', 1)[1].strip()
-    val = re.sub(r'^\w[\w-]*:\s*', '', val).strip().strip('"').strip()
-    return val if val else None
 
-
-def snmp_test_connection(host: str, community: str = "public", port: int = 161,
+def snmp_test_connection(host: str, community: str, port: int = 161,
                          version: str = "2c") -> Tuple[bool, str]:
-    """Testa conectividade SNMP com a OLT."""
+    """Testa a conectividade SNMP com a OLT."""
     try:
-        val = _snmp_get(host, community, OID_SYS_DESCR, port, version, timeout=5)
+        val = _snmp_get(host, community, OID_SYS_DESCR, port, version)
         if val:
-            return True, val
-        return False, "Sem resposta SNMP"
+            return True, f"SNMP OK: {val[:100]}"
+        return False, "SNMP não respondeu (community incorreta ou SNMP desabilitado)"
     except SNMPError as e:
         return False, str(e)
     except Exception as e:
         return False, f"Erro SNMP: {str(e)}"
 
 
-def snmp_get_system_info(host: str, community: str = "public", port: int = 161,
+def snmp_get_system_info(host: str, community: str, port: int = 161,
                          version: str = "2c") -> Dict:
-    """Obtém informações básicas do sistema via SNMP."""
+    """Obtém informações do sistema via SNMP (modelo, firmware, hostname)."""
     result = {}
     try:
-        sys_descr = _snmp_get(host, community, OID_SYS_DESCR, port, version)
-        if sys_descr:
-            result["sys_descr"] = sys_descr
-            m = re.search(r'(C\d{3,4})', sys_descr, re.IGNORECASE)
-            result["model"] = f"ZTE {m.group(1).upper()}" if m else "ZTE Titan"
-            fw = re.search(r'[Vv](\d+\.\d+[\.\d]*)', sys_descr)
-            if fw:
-                result["firmware"] = fw.group(1)
+        descr = _snmp_get(host, community, OID_SYS_DESCR, port, version)
+        if descr:
+            result["sys_descr"] = descr
+            m = re.search(r'(C\d{3,4})', descr)
+            if m:
+                result["model"] = f"ZTE {m.group(1)}"
+            m = re.search(r'[Vv](\d+\.\d+[\.\d]*)', descr)
+            if m:
+                result["firmware"] = m.group(1)
 
-        sys_name = _snmp_get(host, community, OID_SYS_NAME, port, version)
-        if sys_name:
-            result["sys_name"] = sys_name
-
+        name = _snmp_get(host, community, OID_SYS_NAME, port, version)
+        if name:
+            result["hostname"] = name
     except Exception as e:
-        result["error"] = str(e)
+        logger.warning(f"[SNMP] Erro ao obter system info: {e}")
 
     return result
 
 
-def snmp_discover_pon_ports(host: str, community: str = "public", port: int = 161,
-                            version: str = "2c") -> List[Dict]:
+def _detect_card_via_ssh(ip: str, port: int, username: str, password: str,
+                         protocol: str, slot: int, pon: int) -> int:
+    """
+    Detecta o card (subslot) real de uma porta PON via SSH/Telnet.
+    Tenta cards 1, 2, 3, 4 e retorna o primeiro que responder.
+    """
+    try:
+        from .olt_client import get_olt_client, _olt_iface, OLTConnectionError
+        client = get_olt_client(ip, port, username, password, protocol)
+        client.connect()
+
+        for card in [1, 2, 3, 4]:
+            iface = _olt_iface(slot, card, pon)
+            try:
+                out = client.execute_command(f"show gpon onu state {iface}", timeout=8)
+                # Se não retornou erro, essa interface existe
+                if (out.strip() and
+                    "invalid" not in out.lower() and
+                    "error" not in out.lower() and
+                    "not exist" not in out.lower() and
+                    "no such" not in out.lower() and
+                    "%" not in out):
+                    client.disconnect()
+                    logger.info(f"[SNMP] Card detectado via SSH: slot={slot}, card={card}, pon={pon}")
+                    return card
+            except Exception:
+                continue
+
+        client.disconnect()
+    except Exception as e:
+        logger.warning(f"[SNMP] Falha ao detectar card via SSH para slot={slot}, pon={pon}: {e}")
+
+    return 1  # Fallback para card=1
+
+
+def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
+                            version: str = "2c",
+                            ssh_port: int = None, ssh_username: str = None,
+                            ssh_password: str = None, ssh_protocol: str = None) -> List[Dict]:
     """
     Descobre todas as portas PON via SNMP usando a OID proprietária ZTE.
     Detecta automaticamente a base do ifIndex a partir dos dados retornados.
+
+    Se ssh_username for fornecido, detecta o card real via SSH para cada slot único.
+    Caso contrário, usa card=1 como padrão (pode estar errado).
     """
     if not _find_snmp_tool("snmpwalk"):
         raise SNMPError(
@@ -248,48 +284,42 @@ def snmp_discover_pon_ports(host: str, community: str = "public", port: int = 16
         )
 
     # Detecta a base automaticamente: menor índice alinhado a 256
-    # A base é o menor índice que, quando subtraído de si mesmo, dá slot=1, pon=1
     all_indices = sorted([idx for idx, _ in valid_rows])
-
-    # A base é o menor índice menos (slot-1)*65536 - (pon-1)*256
-    # Como não sabemos slot/pon, usamos: base = min_idx - (min_idx % ZTE_SLOT_STEP)
-    # Mas isso pode não funcionar. Melhor: base = min_idx (assume que o menor é slot=1, pon=1)
-    # Verificamos se os índices seguintes são consistentes (diferença de 256)
-    min_idx = all_indices[0]
 
     # Verifica se a diferença entre índices consecutivos é múltipla de 256
     diffs = [all_indices[i+1] - all_indices[i] for i in range(min(len(all_indices)-1, 5))]
     step_ok = all(d % ZTE_PON_STEP == 0 for d in diffs)
 
     if step_ok:
-        # Base é o menor índice (corresponde a slot=1, pon=1)
-        base = min_idx
+        base = all_indices[0]
     else:
-        # Fallback: tenta alinhar à fronteira de slot
-        base = min_idx - (min_idx % ZTE_SLOT_STEP)
+        base = all_indices[0] - (all_indices[0] % ZTE_SLOT_STEP)
+
+    logger.info(f"[SNMP] Base detectada: {base}, total de portas: {len(valid_rows)}")
 
     # Decodifica todos os índices usando a base detectada
     pon_ports = []
     for if_index, val in valid_rows:
         try:
-            slot, pon = _decode_zte_index(if_index, base)
+            slot, pon_num = _decode_zte_index(if_index, base)
         except Exception:
             continue
 
         # Valida: slot e pon devem ser razoáveis
-        if not (1 <= slot <= 16 and 1 <= pon <= 16):
+        if not (1 <= slot <= 16 and 1 <= pon_num <= 16):
             continue
 
         pon_ports.append({
-            "slot": slot,
-            "pon": pon,
-            "if_index": if_index,
-            "if_name": f"gpon-olt_{slot}/{pon}",
+            "slot":      slot,
+            "card":      1,      # Será atualizado abaixo se SSH disponível
+            "pon":       pon_num,
+            "if_index":  if_index,
+            "if_name":   f"gpon-olt_{slot}/1/{pon_num}",  # Provisório
             "port_type": "gpon",
-            "description": val if val else f"gpon-olt_{slot}/{pon}",
-            "status": "unknown",
+            "description": val if val else f"OLT-{pon_num}",
+            "status":    "unknown",
             "onu_count": 0,
-            "_base": base,  # Salva a base para uso posterior
+            "_base":     base,
         })
 
     if not pon_ports:
@@ -299,7 +329,38 @@ def snmp_discover_pon_ports(host: str, community: str = "public", port: int = 16
             f"Índices: {all_indices[:5]}"
         )
 
-    # Busca contagem de ONUs por porta
+    # -------------------------------------------------------
+    # Detecta o card real via SSH para cada slot único
+    # -------------------------------------------------------
+    if ssh_username and ssh_port and ssh_protocol:
+        logger.info(f"[SNMP] Detectando card real via SSH para {len(pon_ports)} portas...")
+        # Agrupa por slot para fazer apenas uma detecção por slot
+        slot_card_map = {}
+        slots_seen = set()
+        for p in pon_ports:
+            slot = p["slot"]
+            if slot not in slots_seen:
+                slots_seen.add(slot)
+                # Usa a primeira porta do slot para detectar o card
+                card = _detect_card_via_ssh(
+                    host, ssh_port, ssh_username, ssh_password, ssh_protocol,
+                    slot, p["pon"]
+                )
+                slot_card_map[slot] = card
+                logger.info(f"[SNMP] Slot {slot} → card={card}")
+
+        # Atualiza card e if_name em todas as portas
+        for p in pon_ports:
+            card = slot_card_map.get(p["slot"], 1)
+            p["card"] = card
+            p["if_name"] = f"gpon-olt_{p['slot']}/{card}/{p['pon']}"
+    else:
+        logger.warning(
+            "[SNMP] SSH não configurado — card será detectado como 1. "
+            "Forneça ssh_username para detecção automática do card."
+        )
+
+    # Busca contagem de ONUs por porta via SNMP
     try:
         onu_rows = _snmp_walk(host, community, OID_ZTE_PON_ONU_COUNT, port, version)
         onu_map = {idx: val for idx, val in onu_rows if idx > 1000}
@@ -309,8 +370,8 @@ def snmp_discover_pon_ports(host: str, community: str = "public", port: int = 16
                 p["onu_count"] = int(val) if str(val).isdigit() else 0
             except (ValueError, TypeError):
                 p["onu_count"] = 0
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[SNMP] Falha ao obter contagem de ONUs: {e}")
 
     # Busca status operacional via ifOperStatus
     try:
@@ -329,30 +390,17 @@ def snmp_discover_pon_ports(host: str, community: str = "public", port: int = 16
             except (ValueError, TypeError):
                 p["status"] = "active"
     except Exception:
-        # Se ifOperStatus falhar, marca como active (porta existe)
         for p in pon_ports:
             if p["status"] == "unknown":
                 p["status"] = "active"
 
-    # Remove campo interno _base antes de retornar
+    # Remove campos internos antes de retornar
     for p in pon_ports:
         p.pop("_base", None)
+        p.pop("if_index", None)
 
-    # Ordena por slot, pon
-    pon_ports.sort(key=lambda x: (x["slot"], x["pon"]))
+    # Ordena por slot, card, pon
+    pon_ports.sort(key=lambda x: (x["slot"], x.get("card", 1), x["pon"]))
+
+    logger.info(f"[SNMP] Descoberta concluída: {len(pon_ports)} portas PON")
     return pon_ports
-
-
-def snmp_get_pon_tx_power(host: str, community: str, slot: int, pon: int,
-                          base: int, port: int = 161,
-                          version: str = "2c") -> Optional[float]:
-    """Retorna a potência laser TX de uma porta PON em dBm."""
-    if_index = _encode_zte_index(slot, pon, base)
-    oid = f"{OID_ZTE_PON_TX_POWER}.{if_index}"
-    try:
-        val = _snmp_get(host, community, oid, port, version)
-        if val:
-            return round(float(val) * 0.001, 2)
-    except Exception:
-        pass
-    return None

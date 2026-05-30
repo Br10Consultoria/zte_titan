@@ -3,8 +3,58 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
+import logging
+import logging.handlers
 
 from .config import settings
+
+
+def _setup_logging():
+    """
+    Configura logging detalhado em arquivo para acompanhamento em tempo real.
+    Arquivo: /opt/zte_titan/data/zte_titan.log (rotativo, max 10MB x 5 arquivos)
+    """
+    log_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data")
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "zte_titan.log")
+
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+    # Handler rotativo (10MB x 5 arquivos)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    file_handler.setFormatter(fmt)
+    file_handler.setLevel(logging.DEBUG)
+
+    # Handler para console (INFO)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(fmt)
+    console_handler.setLevel(logging.INFO)
+
+    # Configura loggers do sistema
+    for name in ["olt_client", "snmp_client", "routes.olts", "routes.onus", "routes.auth"]:
+        lg = logging.getLogger(name)
+        lg.setLevel(logging.DEBUG)
+        if not lg.handlers:
+            lg.addHandler(file_handler)
+            lg.addHandler(console_handler)
+        lg.propagate = False
+
+    # Logger raiz para capturar uvicorn/fastapi
+    root = logging.getLogger()
+    if not any(isinstance(h, logging.handlers.RotatingFileHandler) for h in root.handlers):
+        root.addHandler(file_handler)
+    root.setLevel(logging.INFO)
+
+    print(f"\u2705 Logs em: {os.path.abspath(log_file)}")
+    return log_file
+
+
+_LOG_FILE = _setup_logging()
 from .database import init_db, SessionLocal
 from .auth import create_default_admin
 from .routes import auth, olts, onus
@@ -30,6 +80,24 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(olts.router, prefix="/api")
 app.include_router(onus.router, prefix="/api")
+
+
+@app.get("/api/logs")
+async def get_logs(
+    lines: int = 100,
+    current_user = None
+):
+    """Retorna as últimas N linhas do arquivo de log."""
+    from fastapi.responses import PlainTextResponse
+    try:
+        with open(_LOG_FILE, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
+        last_lines = all_lines[-lines:]
+        return PlainTextResponse("".join(last_lines))
+    except FileNotFoundError:
+        return PlainTextResponse("Arquivo de log não encontrado ainda.")
+    except Exception as e:
+        return PlainTextResponse(f"Erro ao ler log: {e}")
 
 
 @app.get("/api/health")
@@ -118,17 +186,9 @@ def _migrate_db():
             # Se ainda tem a coluna 'port' antiga (sem 'pon'), migra
             if "port" in cols and "pon" not in cols:
                 conn.execute(sa.text("ALTER TABLE olt_ports ADD COLUMN pon INTEGER NOT NULL DEFAULT 1"))
-                # Copia o valor de 'port' para 'pon'
                 conn.execute(sa.text("UPDATE olt_ports SET pon = port"))
                 conn.commit()
                 print("✅ Migração: coluna 'pon' criada a partir de 'port'")
-
-            # Se tem 'card' mas não 'pon', usa card como pon
-            elif "card" in cols and "pon" not in cols:
-                conn.execute(sa.text("ALTER TABLE olt_ports ADD COLUMN pon INTEGER NOT NULL DEFAULT 1"))
-                conn.execute(sa.text("UPDATE olt_ports SET pon = card"))
-                conn.commit()
-                print("✅ Migração: coluna 'pon' criada a partir de 'card'")
 
             # Garante que pon existe
             elif "pon" not in cols:
@@ -136,5 +196,11 @@ def _migrate_db():
                 conn.commit()
                 print("✅ Migração: coluna 'pon' adicionada")
 
+            # Garante que card existe (adicionado para suporte a SLOT/CARD/PON)
+            if "card" not in cols:
+                conn.execute(sa.text("ALTER TABLE olt_ports ADD COLUMN card INTEGER NOT NULL DEFAULT 1"))
+                conn.commit()
+                print("✅ Migração: coluna 'card' adicionada")
+
         except Exception as e:
-            print(f"⚠️  Migração: {e}")
+            print(f"⚠️  Migração olt_ports: {e}")

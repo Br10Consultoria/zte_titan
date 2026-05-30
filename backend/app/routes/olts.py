@@ -1,3 +1,8 @@
+"""
+Rotas de gerenciamento de OLTs.
+Usa formato ZTE Titan: gpon-olt_SLOT/CARD/PON (3 partes)
+"""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -17,6 +22,7 @@ from ..snmp_client import (
 from ..redis_client import cache
 
 router = APIRouter(prefix="/olts", tags=["OLTs"])
+logger = logging.getLogger("routes.olts")
 
 
 @router.get("", response_model=List[OLTResponse])
@@ -40,8 +46,8 @@ def create_olt(
         username=body.username,
         password=body.password,
         protocol=body.protocol,
-        snmp_community=body.snmp_community,
-        snmp_version=body.snmp_version,
+        snmp_community=body.snmp_community or "public",
+        snmp_version=body.snmp_version or "2c",
         status="unknown"
     )
     db.add(olt)
@@ -104,10 +110,7 @@ def test_connection(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Testa conectividade com a OLT.
-    Tenta SNMP primeiro (mais rápido), depois SSH/Telnet como fallback.
-    """
+    """Testa conectividade com a OLT via SNMP e SSH/Telnet."""
     olt = db.query(OLT).filter(OLT.id == olt_id).first()
     if not olt:
         raise HTTPException(status_code=404, detail="OLT não encontrada")
@@ -116,7 +119,7 @@ def test_connection(
     snmp_version = olt.snmp_version or "2c"
     details = {}
 
-    # Tenta SNMP primeiro
+    # Testa SNMP
     snmp_ok, snmp_output = snmp_test_connection(olt.ip, community, 161, snmp_version)
     if snmp_ok:
         details["snmp"] = "ok"
@@ -129,7 +132,7 @@ def test_connection(
     else:
         details["snmp"] = f"indisponível: {snmp_output}"
 
-    # Testa SSH/Telnet também
+    # Testa SSH/Telnet
     ssh_ok, ssh_output = test_olt_connection(
         olt.ip, olt.port, olt.username, olt.password, olt.protocol
     )
@@ -166,9 +169,9 @@ def discover_ports(
     db: Session = Depends(get_db)
 ):
     """
-    Descobre as portas PON da OLT via SNMP (rápido) ou SSH/Telnet (fallback).
-    SNMP: lista todas as interfaces gpon-olt em 1-2 segundos via ifDescr.
-    SSH/Telnet: varre slot 1-4 x pon 1-16 (mais lento, usado se SNMP indisponível).
+    Descobre as portas PON da OLT.
+    Tenta SNMP primeiro (rápido), depois SSH/Telnet como fallback.
+    Formato ZTE Titan: gpon-olt_SLOT/CARD/PON (3 partes)
     """
     olt = db.query(OLT).filter(OLT.id == olt_id).first()
     if not olt:
@@ -180,49 +183,67 @@ def discover_ports(
     ports = []
     error_msgs = []
 
-    # --- Tentativa 1: SNMP (rápido) ---
+    logger.info(f"[DISCOVER] Iniciando descoberta para OLT {olt.name} ({olt.ip})")
+
+    # --- Tentativa 1: SNMP ---
     try:
-        snmp_ports = snmp_discover_pon_ports(olt.ip, community, 161, snmp_version)
+        logger.info(f"[DISCOVER] Tentando SNMP com community '{community}'")
+        # Passa credenciais SSH para detecção automática do card real
+        snmp_ports = snmp_discover_pon_ports(
+            olt.ip, community, 161, snmp_version,
+            ssh_port=olt.port,
+            ssh_username=olt.username,
+            ssh_password=olt.password,
+            ssh_protocol=olt.protocol
+        )
         if snmp_ports:
             ports = snmp_ports
-            # Atualiza modelo/firmware via SNMP
+            logger.info(f"[DISCOVER] SNMP encontrou {len(ports)} portas")
             info = snmp_get_system_info(olt.ip, community, 161, snmp_version)
             if info.get("model"):
                 olt.model = info["model"]
             if info.get("firmware"):
                 olt.firmware = info["firmware"]
-    except SNMPError as e:
+        else:
+            logger.warning("[DISCOVER] SNMP retornou 0 portas, tentando SSH/Telnet")
+            discovery_method = "ssh_telnet"
+    except (SNMPError, Exception) as e:
         error_msgs.append(f"SNMP: {e}")
         discovery_method = "ssh_telnet"
-    except Exception as e:
-        error_msgs.append(f"SNMP erro inesperado: {e}")
-        discovery_method = "ssh_telnet"
+        logger.warning(f"[DISCOVER] SNMP falhou: {e}")
 
-    # --- Tentativa 2: SSH/Telnet (fallback se SNMP falhar) ---
+    # --- Tentativa 2: SSH/Telnet ---
     if not ports:
         try:
+            logger.info(f"[DISCOVER] Tentando SSH/Telnet ({olt.protocol}) em {olt.ip}:{olt.port}")
             ports = discover_olt_ports(
                 olt.ip, olt.port, olt.username, olt.password, olt.protocol
             )
+            logger.info(f"[DISCOVER] SSH/Telnet encontrou {len(ports)} portas")
         except OLTConnectionError as e:
             error_msgs.append(f"SSH/Telnet: {e}")
             raise HTTPException(
                 status_code=503,
-                detail=f"Descoberta falhou via SNMP e SSH/Telnet. Erros: {'; '.join(error_msgs)}"
+                detail=f"Descoberta falhou. Erros: {'; '.join(error_msgs)}"
             )
 
     # Remove portas antigas e insere as novas
     db.query(OLTPort).filter(OLTPort.olt_id == olt_id).delete()
 
     for p in ports:
+        slot = p["slot"]
+        card = p.get("card", 1)
+        pon  = p["pon"]
+        iface = _olt_iface(slot, card, pon)
         port_obj = OLTPort(
             olt_id=olt_id,
-            slot=p["slot"],
-            pon=p["pon"],
+            slot=slot,
+            card=card,
+            pon=pon,
             port_type=p.get("port_type", "gpon"),
-            description=p.get("description", _olt_iface(p["slot"], p["pon"])),
+            description=p.get("description", iface),
             status="unknown",
-            onu_count=0
+            onu_count=p.get("onu_count", 0)
         )
         db.add(port_obj)
 
@@ -240,23 +261,25 @@ def discover_ports(
     )
 
     return {
-        "message": f"Descoberta concluída via {discovery_method.upper()}: {len(ports)} porta(s) PON encontrada(s). Contagem de ONUs sendo atualizada em background...",
+        "message": f"Descoberta via {discovery_method.upper()}: {len(ports)} porta(s) PON encontrada(s). Contagem de ONUs sendo atualizada...",
         "ports_found": len(ports),
         "discovery_method": discovery_method,
         "ports": [
             {
-                "slot": p["slot"],
-                "pon": p["pon"],
-                "interface": _olt_iface(p["slot"], p["pon"]),
-                "type": p.get("port_type", "gpon"),
-                "status": p.get("status", "unknown")
+                "slot":      p["slot"],
+                "card":      p.get("card", 1),
+                "pon":       p["pon"],
+                "interface": _olt_iface(p["slot"], p.get("card", 1), p["pon"]),
+                "type":      p.get("port_type", "gpon"),
+                "onu_count": p.get("onu_count", 0),
             }
             for p in ports
         ]
     }
 
 
-def _update_ports_onu_count(olt_id: int, ip: str, port: int, username: str, password: str, protocol: str):
+def _update_ports_onu_count(olt_id: int, ip: str, port: int,
+                             username: str, password: str, protocol: str):
     """
     Tarefa em background: conecta na OLT e atualiza status e contagem de ONUs
     de cada porta PON descoberta.
@@ -264,37 +287,41 @@ def _update_ports_onu_count(olt_id: int, ip: str, port: int, username: str, pass
     from ..database import SessionLocal
     from ..olt_client import get_olt_client, parse_onu_state, OLTConnectionError, _olt_iface
 
+    logger.info(f"[BG] Iniciando atualização de contagem de ONUs para OLT {olt_id}")
     db = SessionLocal()
     try:
         ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).all()
         if not ports:
+            logger.warning(f"[BG] Nenhuma porta encontrada para OLT {olt_id}")
             return
 
         client = get_olt_client(ip, port, username, password, protocol)
         client.connect()
 
         for p in ports:
-            iface = _olt_iface(p.slot, p.pon)
+            iface = _olt_iface(p.slot, p.card, p.pon)
             try:
-                out = client.execute_command(f"show gpon onu state {iface}", timeout=12)
+                logger.info(f"[BG] Consultando {iface}")
+                out = client.execute_command(f"show gpon onu state {iface}", timeout=15)
                 onus = parse_onu_state(out)
                 p.onu_count = len(onus)
-                online = sum(1 for o in onus if o.get("oper_state") == "working")
                 if len(onus) > 0:
                     p.status = "online"
-                elif out.strip():
-                    p.status = "active"  # porta existe mas sem ONUs
+                elif out.strip() and "invalid" not in out.lower():
+                    p.status = "active"
                 else:
                     p.status = "unknown"
+                logger.info(f"[BG] {iface}: {len(onus)} ONUs, status={p.status}")
             except Exception as ex:
-                print(f"[bg] Erro em {iface}: {ex}")
+                logger.error(f"[BG] Erro em {iface}: {ex}")
                 p.status = "unknown"
 
         client.disconnect()
         db.commit()
-        print(f"[bg] Contagem de ONUs atualizada para OLT {olt_id}")
+        logger.info(f"[BG] Contagem de ONUs atualizada para OLT {olt_id}")
+
     except Exception as e:
-        print(f"[bg] Erro ao atualizar contagem de ONUs OLT {olt_id}: {e}")
+        logger.error(f"[BG] Erro ao atualizar OLT {olt_id}: {e}", exc_info=True)
     finally:
         db.close()
 
@@ -310,7 +337,7 @@ def get_olt_ports(
         raise HTTPException(status_code=404, detail="OLT não encontrada")
 
     ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).order_by(
-        OLTPort.slot, OLTPort.pon
+        OLTPort.slot, OLTPort.card, OLTPort.pon
     ).all()
     return ports
 
