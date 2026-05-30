@@ -228,28 +228,37 @@ def discover_ports(
             )
 
     # Remove portas antigas e insere as novas
-    db.query(OLTPort).filter(OLTPort.olt_id == olt_id).delete()
+    try:
+        db.query(OLTPort).filter(OLTPort.olt_id == olt_id).delete()
+        db.flush()
+        logger.info(f"[DISCOVER] Portas antigas removidas, inserindo {len(ports)} novas")
 
-    for p in ports:
-        slot = p["slot"]
-        card = p.get("card", 1)
-        pon  = p["pon"]
-        iface = _olt_iface(slot, card, pon)
-        port_obj = OLTPort(
-            olt_id=olt_id,
-            slot=slot,
-            card=card,
-            pon=pon,
-            port_type=p.get("port_type", "gpon"),
-            description=p.get("description", iface),
-            status="unknown",
-            onu_count=p.get("onu_count", 0)
-        )
-        db.add(port_obj)
+        for p in ports:
+            slot = p["slot"]
+            card = p.get("card", 1)
+            pon  = p["pon"]
+            iface = _olt_iface(slot, card, pon)
+            logger.debug(f"[DISCOVER] Inserindo porta: slot={slot} card={card} pon={pon} iface={iface}")
+            port_obj = OLTPort(
+                olt_id=olt_id,
+                slot=slot,
+                card=card,
+                pon=pon,
+                port_type=p.get("port_type", "gpon"),
+                description=p.get("description", iface),
+                status="unknown",
+                onu_count=p.get("onu_count", 0)
+            )
+            db.add(port_obj)
 
-    olt.status = "online"
-    olt.last_check = datetime.utcnow()
-    db.commit()
+        olt.status = "online"
+        olt.last_check = datetime.utcnow()
+        db.commit()
+        logger.info(f"[DISCOVER] {len(ports)} portas salvas no banco com sucesso")
+    except Exception as db_err:
+        db.rollback()
+        logger.error(f"[DISCOVER] Erro ao salvar portas no banco: {db_err}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar portas: {str(db_err)}")
 
     # Invalida todo o cache da OLT
     cache.delete_pattern(f"olt:{olt_id}:*")
