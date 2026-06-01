@@ -504,6 +504,46 @@ def parse_onu_detail(output: str, onu_index: str) -> Dict:
     return result
 
 
+def parse_onu_detail_batch(output: str) -> Dict[str, Dict]:
+    """
+    Parseia: show gpon onu detail-info gpon-olt_SLOT/CARD/PON
+    Retorna dict indexado por onu_index (ex: '1/1/1:1') com campos:
+      description, online_duration
+    """
+    results: Dict[str, Dict] = {}
+
+    # Divide o output em blocos por ONU interface
+    blocks = re.split(r'(?=ONU interface:\s+gpon-onu_)', output)
+
+    for block in blocks:
+        if not block.strip():
+            continue
+        m_iface = re.search(r'ONU interface:\s+gpon-onu_(\S+)', block)
+        if not m_iface:
+            continue
+        onu_index = m_iface.group(1).strip()
+
+        # Description: captura apenas o conteúdo na mesma linha (não vazio)
+        description = ""
+        m_desc = re.search(r'Description\s*:\s*(\S[^\n]*)', block)
+        if m_desc:
+            description = m_desc.group(1).strip()
+
+        # Online Duration
+        online_duration = ""
+        m_up = re.search(r'Online Duration\s*:\s*(\S[^\n]*)', block)
+        if m_up:
+            online_duration = m_up.group(1).strip()
+
+        results[onu_index] = {
+            "description":    description,
+            "online_duration": online_duration,
+        }
+
+    _log("debug", f"[PARSER] parse_onu_detail_batch: {len(results)} ONUs")
+    return results
+
+
 def parse_onu_power(output: str, onu_index: str) -> Dict:
     """
     Parseia: show pon power attenuation gpon-onu_1/2/2:85

@@ -25,6 +25,7 @@ from ..olt_client import (
     get_olt_client, OLTConnectionError,
     parse_onu_state, parse_onu_detail, parse_onu_power,
     parse_onu_baseinfo, parse_uncfg_onus, parse_olt_rx_power,
+    parse_onu_detail_batch,
     _olt_iface, _onu_iface, get_onu_full_details
 )
 from ..redis_client import cache
@@ -107,14 +108,27 @@ def get_pon_status(
         except Exception as rx_err:
             logger.warning(f"[PON_STATUS] Falha ao coletar RX OLT: {rx_err}")
 
+        # Detail-info em batch (description + online_duration)
+        detail_map = {}
+        try:
+            logger.info(f"[PON_STATUS] Executando: show gpon onu detail-info {iface}")
+            detail_out = client.execute_command(f"show gpon onu detail-info {iface}", timeout=60)
+            detail_map = parse_onu_detail_batch(detail_out)
+            logger.info(f"[PON_STATUS] Detail-info coletado para {len(detail_map)} ONUs")
+        except Exception as det_err:
+            logger.warning(f"[PON_STATUS] Falha ao coletar detail-info: {det_err}")
+
         client.disconnect()
 
-        # Mescla baseinfo + RX com estado
+        # Mescla baseinfo + RX + detail com estado
         for onu in onus:
             idx = onu["onu_index"]
-            base = base_map.get(idx, {})
-            onu["serial"]     = base.get("serial", "")
-            onu["model"]      = base.get("model", "")
+            base   = base_map.get(idx, {})
+            detail = detail_map.get(idx, {})
+            onu["serial"]          = base.get("serial", "")
+            onu["model"]           = base.get("model", "")
+            onu["description"]     = detail.get("description", "")
+            onu["online_duration"] = detail.get("online_duration", "")
             # RX OLT
             rx_val = rx_map.get(idx)
             if rx_val is not None:

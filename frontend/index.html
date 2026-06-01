@@ -1057,7 +1057,7 @@
               <div class="table-wrap">
                 <table>
                   <thead>
-                    <tr><th>Índice ONU</th><th>Serial</th><th>Tipo/Modelo</th><th>Descrição</th><th>Admin</th><th>Estado</th><th>Última Queda</th><th>RX OLT</th><th>Ações</th></tr>
+                    <tr><th>Índice ONU</th><th>Serial</th><th>Tipo/Modelo</th><th>Descrição</th><th>Admin</th><th>Estado</th><th>Uptime</th><th>RX OLT</th><th>Ações</th></tr>
                   </thead>
                   <tbody>
                     <template x-for="onu in filteredONUs" :key="onu.onu_index">
@@ -1073,11 +1073,12 @@
                                 x-text="onu.oper_state"></span>
                         </td>
                         <td>
-                          <span x-show="onu.last_down_cause"
-                                :class="['LOSi','LOS','LOF'].includes(onu.last_down_cause)?'badge badge-red':['DyingGasp','PowerOff'].includes(onu.last_down_cause)?'badge badge-yellow':['Reboot','OLT Reset'].includes(onu.last_down_cause)?'badge badge-blue':'badge badge-gray'"
-                                :title="onu.last_down_cause==='DyingGasp'?'Falta de energia el\u00e9trica na ONU':onu.last_down_cause==='LOS'||onu.last_down_cause==='LOSi'?'Perda de sinal \u00f3ptico (fibra cortada ou conector ruim)':onu.last_down_cause==='LOF'?'Perda de sincronismo GPON':onu.last_down_cause==='PowerOff'?'ONU desligada':onu.last_down_cause==='Reboot'?'ONU reiniciou':onu.last_down_cause==='OMCI Down'?'Falha de comunica\u00e7\u00e3o OMCI':onu.last_down_cause==='Deactive'?'ONU removida ou desautorizada':onu.last_down_cause==='OLT Reset'?'Reinicializa\u00e7\u00e3o da OLT':onu.last_down_cause"
-                                x-text="onu.last_down_cause"></span>
-                          <span x-show="!onu.last_down_cause" style="color:var(--text-muted)">—</span>
+                          <span x-show="onu.online_duration"
+                                class="td-mono"
+                                style="color:var(--text-secondary);font-size:0.82rem"
+                                :title="'Tempo online desde o último registro: ' + onu.online_duration"
+                                x-text="onu.online_duration"></span>
+                          <span x-show="!onu.online_duration" style="color:var(--text-muted)">—</span>
                         </td>
                         <td>
                           <template x-if="onu.olt_rx_power !== null && onu.olt_rx_power !== undefined">
