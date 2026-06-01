@@ -1,19 +1,29 @@
 """
 SNMP Client para ZTE Titan — descoberta de portas PON via snmpwalk/snmpget do sistema.
 
-A OLT ZTE C320/C600 retorna ifDescr vazio para interfaces PON.
-Usa a OID proprietária ZTE para descobrir as portas:
+Suporta dois formatos de ifIndex ZTE:
+
+  Formato A — ZTE C320/C600/C620/C650 (família C320):
+    ifIndex = 0xTT SS CC PP  (4 bytes)
+      TT = tipo da interface (0x11 = GPON)
+      SS = slot fixo (0x01)
+      CC = card/placa (0x01, 0x02, 0x03 ...)
+      PP = porta PON (0x01 .. 0x10)
+    Exemplo: 0x11010101 = slot=1, card=1, pon=1
+             0x11010201 = slot=1, card=2, pon=1
+    CLI: gpon-olt_1/CARD/PON  (para C320/C600/C620/C650)
+         gpon_olt-SLOT/CARD/PON (para C300/C610 Titan)
+
+  Formato B — ZTE C320 legado (base variável):
+    slot = (if_index - base) // 65536 + 1
+    pon  = ((if_index - base) % 65536) // 256 + 1
+    (mantido como fallback)
+
+OIDs utilizadas:
   1.3.6.1.4.1.3902.1012.3.13.1.1.1  — nome da porta PON (ex: "OLT-1")
   1.3.6.1.4.1.3902.1012.3.13.1.1.13 — contagem de ONUs por porta
   1.3.6.1.2.1.2.2.1.8               — ifOperStatus (1=up, 2=down)
   1.3.6.1.2.1.1.1.0                 — sysDescr (modelo/firmware)
-
-O ifIndex ZTE codifica slot e pon:
-  slot = (if_index - base) // 65536 + 1
-  pon  = ((if_index - base) % 65536) // 256 + 1
-
-O campo 'card' (subslot) NÃO é detectável via SNMP na ZTE C320.
-Ele é detectado via SSH/Telnet após a descoberta SNMP.
 """
 import subprocess
 import re
@@ -22,7 +32,7 @@ from typing import List, Dict, Tuple, Optional
 
 logger = logging.getLogger("snmp_client")
 
-# Constantes ZTE
+# Constantes ZTE formato legado
 ZTE_SLOT_STEP = 65536   # 0x10000
 ZTE_PON_STEP  = 256     # 0x100
 
@@ -51,13 +61,48 @@ def _find_snmp_tool(name: str) -> Optional[str]:
     return None
 
 
-def _decode_zte_index(if_index: int, base: int) -> Tuple[int, int]:
+def _decode_zte_index_new(if_index: int) -> Optional[Tuple[int, int, int]]:
     """
-    Converte ifIndex ZTE para (slot, pon) usando a base detectada.
-    Na ZTE C320/C600, o formato da CLI é gpon-olt_RACK/SLOT/PON onde RACK=1 fixo.
-    O ifIndex codifica o SLOT (placa) e a PON:
-      slot = (if_index - base) // 65536 + 1  → número da placa (1, 2, ...)
-      pon  = ((if_index - base) % 65536) // 256 + 1  → porta PON (1-16)
+    Decodifica ifIndex ZTE no formato novo: 0xTT SS CC PP
+      TT = tipo (0x11 = GPON, 0x12 = XG-PON, etc.)
+      SS = slot (geralmente 0x01)
+      CC = card/placa (1, 2, 3...)
+      PP = porta PON (1..16)
+
+    Retorna (slot, card, pon) ou None se não reconhecido.
+
+    Exemplos reais do ZTE C600:
+      0x11010101 = 285278465 → slot=1, card=1, pon=1
+      0x11010201 = 285278721 → slot=1, card=2, pon=1
+      0x11010301 = 285278977 → slot=1, card=3, pon=1
+    """
+    b = if_index.to_bytes(4, 'big')
+    iface_type = b[0]
+    slot       = b[1]
+    card       = b[2]
+    pon        = b[3]
+
+    # Tipo GPON: 0x11 (17). Aceita também 0x12 (XG-PON) e 0x13
+    if iface_type not in (0x11, 0x12, 0x13):
+        return None
+    # Slot deve ser 1 ou 2 (chassis com 1 ou 2 slots de linha)
+    if not (1 <= slot <= 4):
+        return None
+    # Card: 1..8 (número da placa de linha)
+    if not (1 <= card <= 8):
+        return None
+    # PON: 1..16
+    if not (1 <= pon <= 16):
+        return None
+
+    return slot, card, pon
+
+
+def _decode_zte_index_legacy(if_index: int, base: int) -> Tuple[int, int]:
+    """
+    Converte ifIndex ZTE legado para (slot, pon) usando a base detectada.
+    slot = (if_index - base) // 65536 + 1
+    pon  = ((if_index - base) % 65536) // 256 + 1
     """
     diff = if_index - base
     slot = diff // ZTE_SLOT_STEP + 1
@@ -65,8 +110,13 @@ def _decode_zte_index(if_index: int, base: int) -> Tuple[int, int]:
     return slot, pon
 
 
+def _decode_zte_index(if_index: int, base: int) -> Tuple[int, int]:
+    """Compatibilidade — usa formato legado."""
+    return _decode_zte_index_legacy(if_index, base)
+
+
 def _encode_zte_index(slot: int, pon: int, base: int) -> int:
-    """Converte (slot, pon) para ifIndex ZTE."""
+    """Converte (slot, pon) para ifIndex ZTE legado."""
     return base + (slot - 1) * ZTE_SLOT_STEP + (pon - 1) * ZTE_PON_STEP
 
 
@@ -211,55 +261,21 @@ def snmp_get_system_info(host: str, community: str, port: int = 161,
     return result
 
 
-def _detect_card_via_ssh(ip: str, port: int, username: str, password: str,
-                         protocol: str, slot: int, pon: int) -> int:
-    """
-    Detecta o card (subslot) real de uma porta PON via SSH/Telnet.
-    Tenta cards 1, 2, 3, 4 e retorna o primeiro que responder.
-    Nota: _olt_iface definida localmente para evitar import circular.
-    """
-    def _local_olt_iface(s: int, c: int, p: int) -> str:
-        return f"gpon-olt_{s}/{c}/{p}"
-
-    try:
-        from .olt_client import get_olt_client, OLTConnectionError
-        client = get_olt_client(ip, port, username, password, protocol)
-        client.connect()
-
-        for card in [1, 2, 3, 4]:
-            iface = _local_olt_iface(slot, card, pon)
-            try:
-                out = client.execute_command(f"show gpon onu state {iface}", timeout=8)
-                # Se não retornou erro, essa interface existe
-                if (out.strip() and
-                    "invalid" not in out.lower() and
-                    "error" not in out.lower() and
-                    "not exist" not in out.lower() and
-                    "no such" not in out.lower() and
-                    "%" not in out):
-                    client.disconnect()
-                    logger.info(f"[SNMP] Card detectado via SSH: slot={slot}, card={card}, pon={pon}")
-                    return card
-            except Exception:
-                continue
-
-        client.disconnect()
-    except Exception as e:
-        logger.warning(f"[SNMP] Falha ao detectar card via SSH para slot={slot}, pon={pon}: {e}")
-
-    return 1  # Fallback para card=1
-
-
 def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
                             version: str = "2c",
                             ssh_port: int = None, ssh_username: str = None,
-                            ssh_password: str = None, ssh_protocol: str = None) -> List[Dict]:
+                            ssh_password: str = None, ssh_protocol: str = None,
+                            olt_model: str = None) -> List[Dict]:
     """
     Descobre todas as portas PON via SNMP usando a OID proprietária ZTE.
-    Detecta automaticamente a base do ifIndex a partir dos dados retornados.
 
-    Se ssh_username for fornecido, detecta o card real via SSH para cada slot único.
-    Caso contrário, usa card=1 como padrão (pode estar errado).
+    Suporta dois formatos de ifIndex:
+      - Formato novo (ZTE C600/C610/C300): 0xTT SS CC PP
+      - Formato legado (ZTE C320 antigo): base + slot*65536 + pon*256
+
+    O formato correto da CLI depende do modelo:
+      - zte_c300 / C600 / C610: gpon_olt-SLOT/CARD/PON
+      - zte_c320 / C320 / C620: gpon-olt_1/CARD/PON
     """
     if not _find_snmp_tool("snmpwalk"):
         raise SNMPError(
@@ -289,70 +305,103 @@ def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
             f"{[r[0] for r in pon_rows[:5]]}"
         )
 
-    # Detecta a base automaticamente: menor índice alinhado a 256
     all_indices = sorted([idx for idx, _ in valid_rows])
+    logger.info(f"[SNMP] {len(valid_rows)} portas encontradas. Primeiros índices: {all_indices[:5]}")
 
-    # Verifica se a diferença entre índices consecutivos é múltipla de 256
-    diffs = [all_indices[i+1] - all_indices[i] for i in range(min(len(all_indices)-1, 5))]
-    step_ok = all(d % ZTE_PON_STEP == 0 for d in diffs)
-
-    if step_ok:
-        base = all_indices[0]
-    else:
-        base = all_indices[0] - (all_indices[0] % ZTE_SLOT_STEP)
-
-    logger.info(f"[SNMP] Base detectada: {base}, total de portas: {len(valid_rows)}")
-
-    # Decodifica todos os índices usando a base detectada
+    # -------------------------------------------------------
+    # Tenta decodificar com o formato novo (0xTT SS CC PP)
+    # -------------------------------------------------------
     pon_ports = []
+    new_format_count = 0
+
     for if_index, val in valid_rows:
-        try:
-            slot, pon_num = _decode_zte_index(if_index, base)
-        except Exception:
-            continue
+        decoded = _decode_zte_index_new(if_index)
+        if decoded:
+            new_format_count += 1
+            slot, card, pon_num = decoded
+            pon_ports.append({
+                "slot":      slot,
+                "card":      card,
+                "pon":       pon_num,
+                "if_index":  if_index,
+                "port_type": "gpon",
+                "description": val if val else f"PON-{slot}/{card}/{pon_num}",
+                "status":    "unknown",
+                "onu_count": 0,
+                "_format":   "new",
+            })
 
-        # Valida: slot e pon devem ser razoáveis
-        if not (1 <= slot <= 16 and 1 <= pon_num <= 16):
-            continue
+    logger.info(f"[SNMP] Formato novo: {new_format_count}/{len(valid_rows)} portas decodificadas")
 
-        # Formato CLI ZTE: gpon-olt_RACK/SLOT/PON onde RACK=1 fixo
-        # slot aqui = número da placa (1=slot1, 2=slot2)
-        # Na CLI: gpon-olt_1/1/1 (placa 1, porta 1) e gpon-olt_1/2/1 (placa 2, porta 1)
-        pon_ports.append({
-            "rack":      1,
-            "slot":      slot,
-            "card":      slot,   # card = slot da placa (compatível com banco)
-            "pon":       pon_num,
-            "if_index":  if_index,
-            "if_name":   f"gpon-olt_1/{slot}/{pon_num}",  # Formato ZTE C320 (padrão)
-            "port_type": "gpon",
-            "description": val if val else f"OLT-{pon_num}",
-            "status":    "unknown",
-            "onu_count": 0,
-            "_base":     base,
-        })
+    # -------------------------------------------------------
+    # Fallback: formato legado (base variável)
+    # -------------------------------------------------------
+    if new_format_count < len(valid_rows) * 0.5:
+        # Menos de 50% decodificadas com formato novo → usa legado
+        logger.info("[SNMP] Usando decodificação legada (base variável)")
+        pon_ports = []
+
+        diffs = [all_indices[i+1] - all_indices[i] for i in range(min(len(all_indices)-1, 5))]
+        step_ok = all(d % ZTE_PON_STEP == 0 for d in diffs)
+
+        if step_ok:
+            base = all_indices[0]
+        else:
+            base = all_indices[0] - (all_indices[0] % ZTE_SLOT_STEP)
+
+        logger.info(f"[SNMP] Base legada detectada: {base}")
+
+        for if_index, val in valid_rows:
+            try:
+                slot, pon_num = _decode_zte_index_legacy(if_index, base)
+            except Exception:
+                continue
+
+            if not (1 <= slot <= 16 and 1 <= pon_num <= 16):
+                continue
+
+            pon_ports.append({
+                "slot":      slot,
+                "card":      slot,   # no formato legado, card = slot
+                "pon":       pon_num,
+                "if_index":  if_index,
+                "port_type": "gpon",
+                "description": val if val else f"OLT-{pon_num}",
+                "status":    "unknown",
+                "onu_count": 0,
+                "_format":   "legacy",
+            })
 
     if not pon_ports:
         raise SNMPError(
             f"Nenhuma porta PON válida decodificada de {host}. "
-            f"Base detectada: {base}. "
             f"Índices: {all_indices[:5]}"
         )
 
     # -------------------------------------------------------
-    # Detecta o card real via SSH para cada slot único
+    # Define o formato de interface CLI correto por modelo
     # -------------------------------------------------------
-    # Formato correto ZTE: gpon-olt_1/SLOT/PON (rack=1 fixo, slot=número da placa)
-    # Não é necessário detectar card via SSH — o slot JÁ é o número correto da placa
-    # Exemplo: slot=1 → gpon-olt_1/1/1..16, slot=2 → gpon-olt_1/2/1..16
-    logger.info(f"[SNMP] Usando formato ZTE correto: gpon-olt_1/SLOT/PON (rack=1 fixo)")
+    # C300/C610 (Titan): gpon_olt-SLOT/CARD/PON
+    # C320/C600/C620:    gpon-olt_1/CARD/PON  (rack=1 fixo, card=número da placa)
+    is_c300_family = (olt_model == "zte_c300")
+
     for p in pon_ports:
         slot = p["slot"]
+        card = p["card"]
         pon  = p["pon"]
-        p["card"] = slot   # card = slot da placa (para compatibilidade com o banco)
-        p["if_name"] = f"gpon-olt_1/{slot}/{pon}"
+        if is_c300_family:
+            p["if_name"] = f"gpon_olt-{slot}/{card}/{pon}"
+        else:
+            # C320/C600: rack=1 fixo, card=número da placa
+            p["if_name"] = f"gpon-olt_1/{card}/{pon}"
 
+    logger.info(
+        f"[SNMP] Formato de interface: {'gpon_olt-S/C/P (C300/Titan)' if is_c300_family else 'gpon-olt_1/C/P (C320/C600)'}"
+    )
+
+    # -------------------------------------------------------
     # Busca contagem de ONUs por porta via SNMP
+    # -------------------------------------------------------
     try:
         onu_rows = _snmp_walk(host, community, OID_ZTE_PON_ONU_COUNT, port, version)
         onu_map = {idx: val for idx, val in onu_rows if idx > 1000}
@@ -365,7 +414,9 @@ def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
     except Exception as e:
         logger.warning(f"[SNMP] Falha ao obter contagem de ONUs: {e}")
 
+    # -------------------------------------------------------
     # Busca status operacional via ifOperStatus
+    # -------------------------------------------------------
     try:
         oper_rows = _snmp_walk(host, community, OID_IF_OPER_STATUS, port, version)
         oper_map = {idx: val for idx, val in oper_rows}
@@ -388,7 +439,7 @@ def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
 
     # Remove campos internos antes de retornar
     for p in pon_ports:
-        p.pop("_base", None)
+        p.pop("_format", None)
         p.pop("if_index", None)
 
     # Ordena por slot, card, pon

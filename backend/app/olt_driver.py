@@ -5,8 +5,8 @@ Cada modelo de OLT tem comandos e formatos de interface diferentes.
 Este módulo fornece uma camada de abstração que encapsula essas diferenças.
 
 Modelos suportados:
-  zte_c320  — ZTE C320/C600/C610/C620/C650 (formato: gpon-olt_1/CARD/PON)
-  zte_c300  — ZTE C300/C300M/C300T (formato: gpon_olt-SLOT/CARD/PON)
+  zte_c320  — ZTE C320/C600/C620/C650 (formato: gpon-olt_1/CARD/PON)
+  zte_c300  — ZTE C300/C300M/C300T/C610 Titan (formato: gpon_olt-SLOT/CARD/PON)
 
 Como adicionar um novo modelo:
   1. Crie uma subclasse de OLTDriver

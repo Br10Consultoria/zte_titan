@@ -226,7 +226,8 @@ def discover_ports(
             ssh_port=olt.port,
             ssh_username=olt.username,
             ssh_password=olt.password,
-            ssh_protocol=olt.protocol
+            ssh_protocol=olt.protocol,
+            olt_model=olt.olt_model or "zte_c320"
         )
         if snmp_ports:
             ports = snmp_ports
