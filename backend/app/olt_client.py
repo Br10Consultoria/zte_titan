@@ -933,7 +933,9 @@ def get_onu_full_details(ip: str, port: int, username: str, password: str,
         # 2. Potência e atenuação
         _log("info", f"[ONU_FULL] show pon power attenuation {onu_ref}")
         out = client.execute_command(f"show pon power attenuation {onu_ref}", timeout=15)
+        _log("debug", f"[ONU_FULL] Output bruto power attenuation ({len(out)} chars): {repr(out[:500])}")
         result["power"] = parse_onu_power(out, onu_idx)
+        _log("debug", f"[ONU_FULL] Power parsed: {result['power']}")
 
         # 3. Estado operacional (da lista da porta)
         _log("info", f"[ONU_FULL] show gpon onu state {olt_ref}")
