@@ -7,13 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from typing import Optional
-import pytz
-
-_SP = pytz.timezone('America/Sao_Paulo')
+try:
+    from zoneinfo import ZoneInfo
+    _SP = ZoneInfo('America/Sao_Paulo')
+except ImportError:
+    _SP = None
 
 def _now_iso():
-    """Retorna timestamp atual no fuso horário America/Sao_Paulo."""
-    return datetime.now(_SP).strftime('%d/%m/%Y %H:%M:%S')
+    if _SP:
+        return datetime.now(_SP).strftime('%d/%m/%Y %H:%M:%S')
+    return datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
 from ..database import get_db
 from ..models import User, OLT, OLTPort
