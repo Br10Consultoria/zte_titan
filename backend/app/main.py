@@ -5,6 +5,14 @@ from fastapi.responses import FileResponse, JSONResponse
 import os
 import logging
 import logging.handlers
+import time
+
+# Garante timezone correto mesmo sem tzdata no host
+os.environ.setdefault("TZ", "America/Sao_Paulo")
+try:
+    time.tzset()
+except AttributeError:
+    pass  # Windows não suporta tzset
 
 from .config import settings
 

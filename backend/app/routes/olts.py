@@ -157,7 +157,7 @@ def test_connection(
 
     success = snmp_ok or ssh_ok
     olt.status = "online" if success else "offline"
-    olt.last_check = datetime.utcnow()
+    olt.last_check = datetime.now()
     db.commit()
 
     return {
@@ -261,7 +261,7 @@ def discover_ports(
             db.add(port_obj)
 
         olt.status = "online"
-        olt.last_check = datetime.utcnow()
+        olt.last_check = datetime.now()
         db.commit()
         logger.info(f"[DISCOVER] {len(ports)} portas salvas no banco com sucesso")
     except Exception as db_err:

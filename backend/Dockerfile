@@ -2,11 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Instala dependências do sistema
+# Instala dependências do sistema e timezone
 RUN apt-get update && apt-get install -y \
     gcc \
     libffi-dev \
+    tzdata \
+    && ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime \
+    && echo "America/Sao_Paulo" > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=America/Sao_Paulo
 
 # Copia e instala dependências Python
 COPY requirements.txt .

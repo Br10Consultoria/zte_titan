@@ -5,8 +5,15 @@ Usa formato ZTE Titan: gpon-olt_SLOT/CARD/PON e gpon-onu_SLOT/CARD/PON:ID
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+import pytz
+
+_SP = pytz.timezone('America/Sao_Paulo')
+
+def _now_iso():
+    """Retorna timestamp atual no fuso horário America/Sao_Paulo."""
+    return datetime.now(_SP).strftime('%d/%m/%Y %H:%M:%S')
 
 from ..database import get_db
 from ..models import User, OLT, OLTPort
@@ -117,7 +124,7 @@ def get_pon_status(
             "offline":       offline,
             "cached":        False,
             "cache_expires_in": None,
-            "last_updated":  datetime.utcnow().isoformat()
+            "last_updated":  _now_iso()
         }
 
         cache.set(cache_key, result)
@@ -166,7 +173,7 @@ def get_onu_full_info(
         )
         result["olt_id"]  = olt_id
         result["cached"]  = False
-        result["last_updated"] = datetime.utcnow().isoformat()
+        result["last_updated"] = _now_iso()
 
         cache.set(cache_key, result)
         return result
@@ -208,7 +215,7 @@ def get_unconfigured_onus(
             "onus":   onus,
             "total":  len(onus),
             "cached": False,
-            "last_updated": datetime.utcnow().isoformat()
+            "last_updated": _now_iso()
         }
         cache.set(cache_key, result)
         return result

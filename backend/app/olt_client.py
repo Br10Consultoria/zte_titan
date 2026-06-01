@@ -514,49 +514,79 @@ def parse_onu_power(output: str, onu_index: str) -> Dict:
     """
     result = {"onu_index": onu_index}
 
+    def _safe_float(val: str):
+        """Converte string para float, retorna None se inválido."""
+        try:
+            f = float(val)
+            import math
+            if math.isnan(f) or math.isinf(f):
+                return None
+            return round(f, 3)
+        except (ValueError, TypeError):
+            return None
+
     # Upstream: OLT Rx (potência recebida pela OLT vinda da ONU)
     m = re.search(r'up\s+Rx\s*:\s*([-\d\.]+)\s*\(dbm\)', output, re.IGNORECASE)
     if m:
-        rx_olt = float(m.group(1))
-        result["olt_rx_power"] = rx_olt
-        if rx_olt >= -27:
-            result["olt_rx_status"] = "normal"
-        elif rx_olt >= -29:
-            result["olt_rx_status"] = "warning"
-        else:
-            result["olt_rx_status"] = "critical"
+        rx_olt = _safe_float(m.group(1))
+        if rx_olt is not None:
+            result["olt_rx_power"] = rx_olt
+            if rx_olt >= -27:
+                result["olt_rx_status"] = "normal"
+            elif rx_olt >= -29:
+                result["olt_rx_status"] = "warning"
+            else:
+                result["olt_rx_status"] = "critical"
 
     # Upstream: ONU Tx
     m = re.search(r'up\s+Rx\s*:[-\d\.]+\s*\(dbm\)\s+Tx\s*:\s*([-\d\.]+)\s*\(dbm\)', output, re.IGNORECASE)
     if m:
-        result["onu_tx_power"] = float(m.group(1))
+        v = _safe_float(m.group(1))
+        if v is not None:
+            result["onu_tx_power"] = v
 
     # Upstream: Atenuação
     m = re.search(r'up\s+.*?(\d+\.\d+)\s*\(dB\)', output, re.IGNORECASE)
     if m:
-        result["up_attenuation"] = float(m.group(1))
+        v = _safe_float(m.group(1))
+        if v is not None:
+            result["up_attenuation"] = v
 
     # Downstream: OLT Tx
     m = re.search(r'down\s+Tx\s*:\s*([-\d\.]+)\s*\(dbm\)', output, re.IGNORECASE)
     if m:
-        result["olt_tx_power"] = float(m.group(1))
+        v = _safe_float(m.group(1))
+        if v is not None:
+            result["olt_tx_power"] = v
 
-    # Downstream: ONU Rx
+    # Downstream: ONU Rx — mapeado como rx_power/rx_status para o frontend
     m = re.search(r'down\s+.*?Rx\s*:\s*([-\d\.]+)\s*\(dbm\)', output, re.IGNORECASE)
     if m:
-        onu_rx = float(m.group(1))
-        result["onu_rx_power"] = onu_rx
-        if onu_rx >= -27:
-            result["onu_rx_status"] = "normal"
-        elif onu_rx >= -29:
-            result["onu_rx_status"] = "warning"
-        else:
-            result["onu_rx_status"] = "critical"
+        onu_rx = _safe_float(m.group(1))
+        if onu_rx is not None:
+            result["onu_rx_power"] = onu_rx
+            result["rx_power"] = onu_rx  # alias para o frontend
+            if onu_rx >= -27:
+                result["onu_rx_status"] = "normal"
+                result["rx_status"] = "normal"
+            elif onu_rx >= -29:
+                result["onu_rx_status"] = "warning"
+                result["rx_status"] = "warning"
+            else:
+                result["onu_rx_status"] = "critical"
+                result["rx_status"] = "critical"
 
-    # Downstream: Atenuação
+    # Upstream: ONU Tx — alias tx_power para o frontend
+    if "onu_tx_power" in result:
+        result["tx_power"] = result["onu_tx_power"]
+
+    # Downstream: Atenuação — alias attenuation para o frontend
     m = re.search(r'down\s+.*?(\d+\.\d+)\s*\(dB\)', output, re.IGNORECASE)
     if m:
-        result["down_attenuation"] = float(m.group(1))
+        v = _safe_float(m.group(1))
+        if v is not None:
+            result["down_attenuation"] = v
+            result["attenuation"] = v  # alias para o frontend
 
     _log("debug", f"[PARSER] parse_onu_power {onu_index}: {result}")
     return result
@@ -867,7 +897,7 @@ def get_onu_full_details(ip: str, port: int, username: str, password: str,
         all_states = parse_onu_state(out)
         for s in all_states:
             if s["onu_index"] == onu_idx or s["onu_index"].endswith(f":{onu_id}"):
-                result["state"] = s
+                result["status"] = s
                 break
 
         _log("info", f"[ONU_FULL] Detalhes coletados com sucesso para {onu_ref}")

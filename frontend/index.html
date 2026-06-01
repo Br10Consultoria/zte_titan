@@ -7,89 +7,514 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { font-size: 11px !important; }
-    h1 { font-size: 14px !important; }
-    h2 { font-size: 13px !important; }
-    h3 { font-size: 12px !important; }
-    .text-xs { font-size: 10px !important; }
-    .text-sm { font-size: 11px !important; }
-    .text-base { font-size: 11px !important; }
-    .text-lg { font-size: 12px !important; }
-    .text-xl { font-size: 13px !important; }
-    .text-2xl { font-size: 14px !important; }
-    .text-3xl { font-size: 15px !important; }
-    body { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', 'Segoe UI', sans-serif; }
-    .sidebar { width: 200px; min-width: 200px; background: #1e293b; border-right: 1px solid #334155; }
-    .main-content { flex: 1; overflow-y: auto; background: #0f172a; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; }
-    .card-header { background: #273549; border-bottom: 1px solid #334155; border-radius: 8px 8px 0 0; padding: 8px 12px; }
-    .btn { padding: 5px 12px; border-radius: 5px; cursor: pointer; border: none; font-weight: 500; transition: all 0.2s; }
-    .btn-primary { background: #3b82f6; color: white; }
-    .btn-primary:hover { background: #2563eb; }
-    .btn-success { background: #22c55e; color: white; }
-    .btn-success:hover { background: #16a34a; }
-    .btn-danger { background: #ef4444; color: white; }
-    .btn-danger:hover { background: #dc2626; }
-    .btn-warning { background: #f59e0b; color: #1e293b; }
-    .btn-warning:hover { background: #d97706; }
-    .btn-secondary { background: #475569; color: white; }
-    .btn-secondary:hover { background: #334155; }
-    .btn-sm { padding: 3px 8px; }
-    .input-field { background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 6px 10px; border-radius: 5px; width: 100%; outline: none; }
-    .input-field:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-    .badge { padding: 2px 8px; border-radius: 12px; font-weight: 600; }
-    .badge-green { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-    .badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
-    .badge-yellow { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
-    .badge-gray { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
-    .badge-blue { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
-    .table-container { overflow-x: auto; }
+    :root {
+      --bg-base:        #07090f;
+      --bg-surface:     #0d1117;
+      --bg-card:        #161b27;
+      --bg-hover:       #1c2333;
+      --bg-input:       #0d1117;
+      --border:         #21304d;
+      --border-dim:     #182035;
+      --text-primary:   #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted:     #3d5068;
+      --accent:         #2f81f7;
+      --accent-dark:    #1f6feb;
+      --accent-glow:    rgba(47,129,247,0.12);
+      --accent-border:  rgba(47,129,247,0.3);
+      --green:          #3fb950;
+      --green-glow:     rgba(63,185,80,0.12);
+      --red:            #f85149;
+      --red-glow:       rgba(248,81,73,0.12);
+      --yellow:         #d29922;
+      --yellow-glow:    rgba(210,153,34,0.12);
+      --purple:         #bc8cff;
+      --purple-glow:    rgba(188,140,255,0.12);
+      --sidebar-w:      240px;
+      --sidebar-w-sm:   60px;
+      --topbar-h:       54px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Scrollbar ─────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2a4a70; }
+
+    /* ── Layout shell ──────────────────────────────────────────── */
+    .app-shell { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Sidebar ───────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-dim);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.22s cubic-bezier(.4,0,.2,1), min-width 0.22s cubic-bezier(.4,0,.2,1);
+      position: relative;
+      z-index: 20;
+    }
+    .sidebar.collapsed {
+      width: var(--sidebar-w-sm);
+      min-width: var(--sidebar-w-sm);
+    }
+
+    /* Logo area */
+    .sidebar-logo {
+      height: var(--topbar-h);
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border-dim);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .sidebar-logo .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 16px rgba(47,129,247,0.3);
+    }
+    .sidebar-logo .logo-icon img { width: 24px; height: 24px; object-fit: contain; }
+    .sidebar-logo .logo-icon i { color: white; font-size: 14px; }
+    .sidebar-logo .logo-text { overflow: hidden; white-space: nowrap; }
+    .sidebar-logo .logo-name {
+      font-size: 14px; font-weight: 800;
+      background: linear-gradient(90deg, #e6edf3 0%, #8b949e 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      letter-spacing: -0.3px; line-height: 1.2;
+    }
+    .sidebar-logo .logo-sub { font-size: 10px; color: var(--text-muted); font-weight: 400; }
+
+    /* Nav */
+    .sidebar-nav { flex: 1; padding: 10px 8px; overflow-y: auto; overflow-x: hidden; }
+    .nav-section {
+      font-size: 9.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text-muted);
+      padding: 14px 8px 5px;
+      white-space: nowrap; overflow: hidden;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-weight: 500; font-size: 12.5px;
+      transition: all 0.15s;
+      margin-bottom: 2px;
+      white-space: nowrap; overflow: hidden;
+      position: relative;
+    }
+    .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .nav-item.active {
+      background: var(--accent-glow);
+      color: #79c0ff;
+      border: 1px solid var(--accent-border);
+    }
+    .nav-item.active::before {
+      content: '';
+      position: absolute; left: 0; top: 4px; bottom: 4px;
+      width: 3px; background: var(--accent);
+      border-radius: 0 3px 3px 0;
+    }
+    .nav-item i { width: 18px; text-align: center; font-size: 13px; flex-shrink: 0; }
+    .nav-item .nav-label { overflow: hidden; text-overflow: ellipsis; }
+
+    /* Sidebar user */
+    .sidebar-user {
+      padding: 12px;
+      border-top: 1px solid var(--border-dim);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .user-row { display: flex; align-items: center; gap: 9px; }
+    .user-avatar {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), #6366f1);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 700; font-size: 13px;
+      flex-shrink: 0;
+    }
+    .user-info { min-width: 0; overflow: hidden; }
+    .user-name { color: var(--text-primary); font-weight: 700; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-role { color: var(--text-muted); font-size: 10.5px; }
+
+    /* ── Topbar ────────────────────────────────────────────────── */
+    .topbar {
+      height: var(--topbar-h);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-dim);
+      display: flex; align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-size: 15px; font-weight: 700; color: var(--text-primary);
+      display: flex; align-items: center; gap: 9px;
+    }
+    .topbar-title i { color: var(--accent); font-size: 14px; }
+    .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    /* ── Main content ──────────────────────────────────────────── */
+    .main-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    .main-content { flex: 1; overflow-y: auto; background: var(--bg-base); }
+    .page-body { padding: 20px 22px 28px; }
+
+    /* ── Cards ─────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-dim);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      background: var(--bg-hover);
+      border-bottom: 1px solid var(--border-dim);
+      padding: 11px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-weight: 600; color: var(--text-primary); font-size: 12.5px;
+    }
+    .card-body { padding: 16px; }
+
+    /* Stat cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-dim);
+      border-radius: 10px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .stat-card:hover { transform: translateY(-1px); }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      border-radius: 10px 10px 0 0;
+    }
+    .stat-card.blue  { border-color: rgba(47,129,247,0.2); }
+    .stat-card.blue::after  { background: linear-gradient(90deg, var(--accent), #6366f1); }
+    .stat-card.green { border-color: rgba(63,185,80,0.2); }
+    .stat-card.green::after { background: linear-gradient(90deg, var(--green), #22d3ee); }
+    .stat-card.red   { border-color: rgba(248,81,73,0.2); }
+    .stat-card.red::after   { background: linear-gradient(90deg, var(--red), #f59e0b); }
+    .stat-card.purple{ border-color: rgba(188,140,255,0.2); }
+    .stat-card.purple::after{ background: linear-gradient(90deg, var(--purple), #ec4899); }
+    .stat-card.yellow{ border-color: rgba(210,153,34,0.2); }
+    .stat-card.yellow::after{ background: linear-gradient(90deg, var(--yellow), #f97316); }
+    .stat-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; margin-bottom: 10px;
+    }
+    .stat-icon.blue   { background: var(--accent-glow); color: #79c0ff; }
+    .stat-icon.green  { background: var(--green-glow);  color: #56d364; }
+    .stat-icon.red    { background: var(--red-glow);    color: #ff7b72; }
+    .stat-icon.purple { background: var(--purple-glow); color: var(--purple); }
+    .stat-icon.yellow { background: var(--yellow-glow); color: #e3b341; }
+    .stat-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .stat-value { font-size: 28px; font-weight: 800; line-height: 1; }
+    .stat-value.blue   { color: #79c0ff; }
+    .stat-value.green  { color: #56d364; }
+    .stat-value.red    { color: #ff7b72; }
+    .stat-value.purple { color: var(--purple); }
+    .stat-value.yellow { color: #e3b341; }
+
+    /* ── Buttons ───────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      border-radius: 7px;
+      cursor: pointer; border: none;
+      font-weight: 600; font-size: 12px;
+      transition: all 0.15s;
+      white-space: nowrap; text-decoration: none;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary   { background: var(--accent); color: white; }
+    .btn-primary:hover:not(:disabled)   { background: var(--accent-dark); box-shadow: 0 0 12px rgba(47,129,247,0.3); }
+    .btn-success   { background: #238636; color: white; }
+    .btn-success:hover:not(:disabled)   { background: #2ea043; }
+    .btn-danger    { background: #da3633; color: white; }
+    .btn-danger:hover:not(:disabled)    { background: #b91c1c; }
+    .btn-warning   { background: #9e6a03; color: white; }
+    .btn-warning:hover:not(:disabled)   { background: #b45309; }
+    .btn-secondary { background: var(--bg-hover); color: var(--text-secondary); border: 1px solid var(--border); }
+    .btn-secondary:hover:not(:disabled) { color: var(--text-primary); border-color: var(--accent-border); }
+    .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+    .btn-ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
+    .btn-sm  { padding: 5px 12px; font-size: 11.5px; }
+    .btn-xs  { padding: 3px 9px; font-size: 11px; border-radius: 6px; }
+    .btn-icon{ padding: 5px 8px; }
+
+    /* ── Inputs ────────────────────────────────────────────────── */
+    .input-field {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 7px 11px;
+      border-radius: 7px;
+      width: 100%;
+      outline: none;
+      font-size: 12.5px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+    .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,129,247,0.1); }
+    .input-field::placeholder { color: var(--text-muted); }
+    .input-field:disabled { opacity: 0.5; cursor: not-allowed; }
+    label.form-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+
+    /* ── Badges ────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+    }
+    .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; }
+    .badge-green  { background: var(--green-glow);  color: #56d364; border: 1px solid rgba(63,185,80,0.3); }
+    .badge-green::before  { background: #56d364; }
+    .badge-red    { background: var(--red-glow);    color: #ff7b72; border: 1px solid rgba(248,81,73,0.3); }
+    .badge-red::before    { background: #ff7b72; }
+    .badge-yellow { background: var(--yellow-glow); color: #e3b341; border: 1px solid rgba(210,153,34,0.3); }
+    .badge-yellow::before { background: #e3b341; }
+    .badge-blue   { background: var(--accent-glow); color: #79c0ff; border: 1px solid var(--accent-border); }
+    .badge-blue::before   { background: #79c0ff; }
+    .badge-purple { background: var(--purple-glow); color: var(--purple); border: 1px solid rgba(188,140,255,0.3); }
+    .badge-purple::before { background: var(--purple); }
+    .badge-gray   { background: rgba(139,148,158,0.08); color: #8b949e; border: 1px solid rgba(139,148,158,0.2); }
+    .badge-gray::before   { background: #8b949e; }
+
+    /* ── Tables ────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
-    thead th { background: #273549; color: #94a3b8; padding: 7px 10px; text-align: left; border-bottom: 1px solid #334155; font-weight: 600; white-space: nowrap; }
-    tbody tr { border-bottom: 1px solid #1e293b; transition: background 0.15s; }
-    tbody tr:hover { background: #273549; }
-    tbody td { padding: 6px 10px; color: #cbd5e1; white-space: nowrap; }
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 50; display: flex; align-items: center; justify-content: center; }
-    .modal { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 20px; min-width: 360px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
-    .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s; color: #94a3b8; margin-bottom: 2px; }
-    .nav-item:hover { background: #273549; color: #e2e8f0; }
-    .nav-item.active { background: rgba(59,130,246,0.15); color: #60a5fa; border-left: 3px solid #3b82f6; }
-    .nav-item i { width: 16px; text-align: center; }
-    .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; }
-    .signal-bar { height: 4px; border-radius: 2px; }
-    .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid #475569; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .toast { position: fixed; bottom: 20px; right: 20px; z-index: 100; padding: 10px 16px; border-radius: 8px; color: white; font-weight: 500; animation: slideIn 0.3s ease; }
-    .toast-success { background: #16a34a; }
-    .toast-error { background: #dc2626; }
-    .toast-info { background: #2563eb; }
-    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    .qr-container { background: white; padding: 12px; border-radius: 8px; display: inline-block; }
-    .section-title { color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; padding: 8px 12px 4px; }
-    .power-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .power-normal { background: #4ade80; }
-    .power-warning { background: #fbbf24; }
-    .power-critical { background: #f87171; }
-    .power-unknown { background: #94a3b8; }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    .login-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 32px; width: 340px; }
-    .logo-text { font-size: 18px !important; font-weight: 800; color: #3b82f6; letter-spacing: -0.5px; }
-    .logo-sub { font-size: 10px !important; color: #64748b; }
-    pre { white-space: pre-wrap; word-break: break-all; background: #0f172a; padding: 10px; border-radius: 6px; border: 1px solid #334155; color: #94a3b8; max-height: 300px; overflow-y: auto; }
-    .tab-btn { padding: 6px 14px; border-radius: 5px; cursor: pointer; color: #64748b; border: 1px solid transparent; transition: all 0.15s; }
-    .tab-btn.active { background: rgba(59,130,246,0.15); color: #60a5fa; border-color: rgba(59,130,246,0.3); }
-    .tab-btn:hover:not(.active) { color: #94a3b8; background: #273549; }
-    .onu-row-online { border-left: 3px solid #4ade80; }
-    .onu-row-offline { border-left: 3px solid #f87171; }
-    .onu-row-warning { border-left: 3px solid #fbbf24; }
+    thead th {
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      padding: 9px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-dim);
+      font-weight: 700; font-size: 10.5px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid rgba(24,32,53,0.8); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(28,35,51,0.7); }
+    tbody td { padding: 9px 14px; color: var(--text-secondary); font-size: 12.5px; }
+    tbody td.td-primary { color: var(--text-primary); font-weight: 600; }
+    tbody td.td-mono { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-size: 12px; }
+
+    /* ONU row accents */
+    .onu-online  td:first-child { border-left: 3px solid var(--green); }
+    .onu-offline td:first-child { border-left: 3px solid var(--red); }
+    .onu-warning td:first-child { border-left: 3px solid var(--yellow); }
+
+    /* ── Modals ────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.15s ease;
+    }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+      animation: slideUp 0.2s ease;
+    }
+    .modal-lg { max-width: 760px; }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-dim);
+    }
+    .modal-title { font-size: 15px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 9px; }
+    .modal-title i { color: var(--accent); }
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* ── Tabs ──────────────────────────────────────────────────── */
+    .tab-bar {
+      display: flex; gap: 2px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border-dim);
+      padding-bottom: 0;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 7px 14px;
+      cursor: pointer;
+      color: var(--text-muted);
+      border: none; border-bottom: 2px solid transparent;
+      font-size: 12px; font-weight: 600;
+      transition: all 0.15s;
+      background: transparent;
+      white-space: nowrap;
+      margin-bottom: -1px;
+    }
+    .tab-btn.active { color: #79c0ff; border-bottom-color: var(--accent); }
+    .tab-btn:hover:not(.active) { color: var(--text-secondary); }
+
+    /* ── Detail grid ───────────────────────────────────────────── */
     .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .detail-item { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px 10px; }
-    .detail-label { color: #64748b; font-weight: 600; margin-bottom: 2px; }
-    .detail-value { color: #e2e8f0; font-weight: 500; }
+    .detail-item {
+      background: var(--bg-base);
+      border: 1px solid var(--border-dim);
+      border-radius: 8px;
+      padding: 10px 13px;
+    }
+    .detail-label { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .detail-value { font-size: 12.5px; color: var(--text-primary); font-weight: 500; }
+    .detail-value.mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; color: #79c0ff; }
+
+    /* ── Power indicator ───────────────────────────────────────── */
+    .power-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .power-normal   { background: #56d364; box-shadow: 0 0 6px rgba(86,211,100,0.6); }
+    .power-warning  { background: #e3b341; box-shadow: 0 0 6px rgba(227,179,65,0.6); }
+    .power-critical { background: #ff7b72; box-shadow: 0 0 6px rgba(255,123,114,0.6); }
+    .power-unknown  { background: #3d5068; }
+
+    /* ── Toast ─────────────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 100;
+      padding: 13px 18px;
+      border-radius: 10px;
+      color: white; font-weight: 600; font-size: 13px;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      animation: slideIn 0.3s cubic-bezier(.4,0,.2,1);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .toast-success { background: linear-gradient(135deg,#238636,#2ea043); border: 1px solid rgba(63,185,80,0.3); }
+    .toast-error   { background: linear-gradient(135deg,#da3633,#b91c1c); border: 1px solid rgba(248,81,73,0.3); }
+    .toast-info    { background: linear-gradient(135deg,#1f6feb,#2f81f7); border: 1px solid var(--accent-border); }
+    @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── Spinner ───────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+    .spinner-lg { width: 32px; height: 32px; border-width: 3px; border-top-color: var(--accent); border-color: rgba(47,129,247,0.15); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Cache bar ─────────────────────────────────────────────── */
+    .cache-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(210,153,34,0.07);
+      border: 1px solid rgba(210,153,34,0.2);
+      border-radius: 8px;
+      padding: 8px 13px;
+      color: #e3b341;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+
+    /* ── Login ─────────────────────────────────────────────────── */
+    .login-wrap {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background:
+        radial-gradient(ellipse at 70% 20%, rgba(47,129,247,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse at 20% 80%, rgba(99,102,241,0.06) 0%, transparent 50%),
+        var(--bg-base);
+    }
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 36px;
+      width: 380px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    }
+    .login-logo { text-align: center; margin-bottom: 32px; }
+    .login-logo img { height: 56px; margin: 0 auto 12px; display: block; }
+    .login-logo .brand { font-size: 24px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
+    .login-logo .brand span { color: var(--accent); }
+    .login-logo .brand-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Divider ───────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border-dim); margin: 16px 0; }
+
+    /* ── Code/pre ──────────────────────────────────────────────── */
+    pre {
+      white-space: pre-wrap; word-break: break-all;
+      background: var(--bg-base);
+      padding: 12px; border-radius: 8px;
+      border: 1px solid var(--border-dim);
+      color: var(--text-secondary);
+      max-height: 280px; overflow-y: auto;
+      font-size: 11.5px;
+    }
+    .qr-container { background: white; padding: 14px; border-radius: 10px; display: inline-block; }
+
+    /* ── Empty state ───────────────────────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 56px 24px;
+      color: var(--text-muted);
+    }
+    .empty-state i { font-size: 40px; color: var(--border); display: block; margin-bottom: 14px; }
+    .empty-state p { font-size: 13px; }
+
+    /* ── Responsive ────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .sidebar { width: var(--sidebar-w-sm); min-width: var(--sidebar-w-sm); }
+      .sidebar-logo .logo-text,
+      .nav-item .nav-label,
+      .nav-section,
+      .user-info,
+      .sidebar-user .btn span { display: none; }
+      .nav-item { justify-content: center; padding: 10px; }
+      .nav-item.active::before { display: none; }
+      .sidebar-user .btn { padding: 7px; justify-content: center; }
+      .sidebar-logo { justify-content: center; padding: 0; }
+    }
+    @media (max-width: 600px) {
+      .page-body { padding: 14px 12px 20px; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .login-card { width: 100%; padding: 28px 20px; }
+    }
   </style>
 </head>
 <body>
@@ -98,634 +523,696 @@
 
   <!-- TOAST -->
   <template x-if="toast.show">
-    <div :class="'toast toast-' + toast.type" x-text="toast.message"></div>
+    <div :class="'toast toast-' + toast.type">
+      <i :class="toast.type==='success'?'fas fa-circle-check':toast.type==='error'?'fas fa-circle-xmark':'fas fa-circle-info'" style="font-size:15px;flex-shrink:0"></i>
+      <span x-text="toast.message"></span>
+    </div>
   </template>
 
-  <!-- LOGIN -->
-  <div x-show="!isLoggedIn" class="min-h-screen flex items-center justify-center">
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- LOGIN                                                          -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div x-show="!isLoggedIn" class="login-wrap">
     <div class="login-card">
-      <div class="text-center mb-6">
-        <div class="logo-text"><i class="fas fa-network-wired mr-2"></i>ZTE TITAN</div>
-        <div class="logo-sub mt-1">Sistema de Gerenciamento de ONUs</div>
+      <div class="login-logo">
+        <template x-if="logoExists">
+          <img :src="logoSrc" alt="Logo" />
+        </template>
+        <template x-if="!logoExists">
+          <div style="width:60px;height:60px;background:linear-gradient(135deg,var(--accent),#6366f1);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;box-shadow:0 0 24px rgba(47,129,247,0.4)">
+            <i class="fas fa-network-wired" style="color:white;font-size:26px"></i>
+          </div>
+        </template>
+        <div class="brand"><span x-text="appTitle || 'ZTE'"></span> <span>TITAN</span></div>
+        <div class="brand-sub">Sistema de Gerenciamento de ONUs</div>
       </div>
 
       <!-- STEP 1: Login -->
       <div x-show="loginStep === 1">
         <div class="mb-4">
-          <label class="block mb-1" style="color:#94a3b8">Usuário</label>
+          <label class="form-label"><i class="fas fa-user mr-1"></i> Usuário</label>
           <input x-model="loginForm.username" type="text" class="input-field" placeholder="Digite seu usuário"
-                 @keydown.enter="doLogin()" />
+                 @keydown.enter="doLogin()" autocomplete="username" />
         </div>
         <div class="mb-5">
-          <label class="block mb-1" style="color:#94a3b8">Senha</label>
-          <div class="relative">
+          <label class="form-label"><i class="fas fa-lock mr-1"></i> Senha</label>
+          <div style="position:relative">
             <input x-model="loginForm.password" :type="showPass ? 'text' : 'password'" class="input-field"
-                   placeholder="Digite sua senha" @keydown.enter="doLogin()" />
-            <button @click="showPass=!showPass" class="absolute right-2 top-1/2 -translate-y-1/2" style="color:#64748b;background:none;border:none;cursor:pointer">
+                   placeholder="Digite sua senha" @keydown.enter="doLogin()" autocomplete="current-password"
+                   style="padding-right:40px" />
+            <button @click="showPass=!showPass" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px">
               <i :class="showPass ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
             </button>
           </div>
         </div>
-        <button @click="doLogin()" class="btn btn-primary w-full" :disabled="loginLoading">
-          <span x-show="loginLoading" class="loading mr-2"></span>
+        <button @click="doLogin()" class="btn btn-primary w-full" style="justify-content:center;padding:11px;font-size:13px" :disabled="loginLoading">
+          <span x-show="loginLoading" class="spinner"></span>
           <span x-text="loginLoading ? 'Autenticando...' : 'Entrar'"></span>
         </button>
-        <div x-show="loginError" class="mt-3 text-center" style="color:#f87171" x-text="loginError"></div>
+        <div x-show="loginError" class="mt-3 text-center" style="color:#ff7b72;font-size:12px;background:var(--red-glow);border:1px solid rgba(248,81,73,0.2);border-radius:7px;padding:8px" x-text="loginError"></div>
       </div>
 
       <!-- STEP 2: 2FA -->
       <div x-show="loginStep === 2">
-        <div class="text-center mb-4">
-          <i class="fas fa-shield-halved text-3xl" style="color:#3b82f6"></i>
-          <div class="mt-2" style="color:#94a3b8">Autenticação de Dois Fatores</div>
-          <div class="mt-1" style="color:#64748b">Digite o código do seu aplicativo autenticador</div>
+        <div class="text-center mb-5">
+          <div style="width:56px;height:56px;background:var(--accent-glow);border:1px solid var(--accent-border);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+            <i class="fas fa-shield-halved" style="color:var(--accent);font-size:24px"></i>
+          </div>
+          <div style="color:var(--text-primary);font-weight:700;font-size:16px">Verificação em 2 Etapas</div>
+          <div class="mt-2" style="color:var(--text-muted);font-size:12px">Digite o código do seu aplicativo autenticador</div>
         </div>
         <div class="mb-4">
           <input x-model="twoFACode" type="text" class="input-field text-center" placeholder="000000"
-                 maxlength="6" @keydown.enter="verify2FA()" style="letter-spacing:0.3em;font-size:16px!important" />
+                 maxlength="6" @keydown.enter="verify2FA()"
+                 style="letter-spacing:0.5em;font-size:22px;text-align:center;font-weight:700" />
         </div>
-        <button @click="verify2FA()" class="btn btn-primary w-full" :disabled="loginLoading">
-          <span x-show="loginLoading" class="loading mr-2"></span>
-          <span x-text="loginLoading ? 'Verificando...' : 'Verificar'"></span>
+        <button @click="verify2FA()" class="btn btn-primary w-full" style="justify-content:center;padding:11px;font-size:13px" :disabled="loginLoading">
+          <span x-show="loginLoading" class="spinner"></span>
+          <span x-text="loginLoading ? 'Verificando...' : 'Verificar Código'"></span>
         </button>
-        <button @click="loginStep=1;twoFACode=''" class="btn btn-secondary w-full mt-2">Voltar</button>
-        <div x-show="loginError" class="mt-3 text-center" style="color:#f87171" x-text="loginError"></div>
+        <button @click="loginStep=1;twoFACode=''" class="btn btn-ghost w-full mt-2" style="justify-content:center">
+          <i class="fas fa-arrow-left"></i> Voltar
+        </button>
+        <div x-show="loginError" class="mt-3 text-center" style="color:#ff7b72;font-size:12px;background:var(--red-glow);border:1px solid rgba(248,81,73,0.2);border-radius:7px;padding:8px" x-text="loginError"></div>
       </div>
     </div>
   </div>
 
-  <!-- MAIN APP -->
-  <div x-show="isLoggedIn" class="flex h-screen overflow-hidden">
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- MAIN APP                                                       -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div x-show="isLoggedIn" class="app-shell">
 
-    <!-- SIDEBAR -->
-    <div class="sidebar flex flex-col">
+    <!-- ── Sidebar ─────────────────────────────────────────────── -->
+    <aside class="sidebar" :class="{'collapsed': sidebarCollapsed}">
       <!-- Logo -->
-      <div class="p-3 border-b" style="border-color:#334155">
-        <div class="logo-text"><i class="fas fa-network-wired mr-1"></i>ZTE TITAN</div>
-        <div class="logo-sub">Manager v1.0</div>
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <template x-if="logoExists">
+            <img :src="logoSrc" alt="Logo" />
+          </template>
+          <template x-if="!logoExists">
+            <i class="fas fa-network-wired"></i>
+          </template>
+        </div>
+        <div class="logo-text">
+          <div class="logo-name" x-text="appTitle || 'ZTE TITAN'"></div>
+          <div class="logo-sub">Manager v1.0</div>
+        </div>
       </div>
 
       <!-- Nav -->
-      <nav class="flex-1 p-2 overflow-y-auto">
-        <div class="section-title">Principal</div>
-        <div @click="setPage('dashboard')" :class="{'active': page==='dashboard'}" class="nav-item">
-          <i class="fas fa-gauge-high"></i> Dashboard
+      <nav class="sidebar-nav">
+        <div class="nav-section">Principal</div>
+        <div @click="setPage('dashboard')" :class="{'active': page==='dashboard'}" class="nav-item" title="Dashboard">
+          <i class="fas fa-gauge-high"></i><span class="nav-label">Dashboard</span>
         </div>
-        <div @click="setPage('olts')" :class="{'active': page==='olts'}" class="nav-item">
-          <i class="fas fa-server"></i> OLTs
+        <div @click="setPage('olts')" :class="{'active': page==='olts'}" class="nav-item" title="OLTs">
+          <i class="fas fa-server"></i><span class="nav-label">OLTs</span>
         </div>
-        <div @click="setPage('onus')" :class="{'active': page==='onus'}" class="nav-item">
-          <i class="fas fa-router"></i> ONUs
+        <div @click="setPage('onus')" :class="{'active': page==='onus'}" class="nav-item" title="ONUs">
+          <i class="fas fa-router"></i><span class="nav-label">ONUs</span>
         </div>
-        <div @click="setPage('uncfg')" :class="{'active': page==='uncfg'}" class="nav-item">
-          <i class="fas fa-circle-exclamation"></i> Não Provisionadas
+        <div @click="setPage('uncfg')" :class="{'active': page==='uncfg'}" class="nav-item" title="Não Provisionadas">
+          <i class="fas fa-circle-exclamation"></i><span class="nav-label">Não Provisionadas</span>
         </div>
-        <div @click="setPage('search')" :class="{'active': page==='search'}" class="nav-item">
-          <i class="fas fa-magnifying-glass"></i> Buscar ONU
+        <div @click="setPage('search')" :class="{'active': page==='search'}" class="nav-item" title="Buscar ONU">
+          <i class="fas fa-magnifying-glass"></i><span class="nav-label">Buscar ONU</span>
         </div>
 
-        <div class="section-title mt-2">Sistema</div>
+        <div class="nav-section">Sistema</div>
         <template x-if="currentUser && currentUser.role === 'admin'">
-          <div>
-            <div @click="setPage('users')" :class="{'active': page==='users'}" class="nav-item">
-              <i class="fas fa-users"></i> Usuários
-            </div>
+          <div @click="setPage('users')" :class="{'active': page==='users'}" class="nav-item" title="Usuários">
+            <i class="fas fa-users"></i><span class="nav-label">Usuários</span>
           </div>
         </template>
-        <div @click="setPage('profile')" :class="{'active': page==='profile'}" class="nav-item">
-          <i class="fas fa-user-gear"></i> Meu Perfil
+        <div @click="setPage('profile')" :class="{'active': page==='profile'}" class="nav-item" title="Meu Perfil">
+          <i class="fas fa-user-gear"></i><span class="nav-label">Meu Perfil</span>
         </div>
       </nav>
 
-      <!-- User info -->
-      <div class="p-3 border-t" style="border-color:#334155">
-        <div class="flex items-center gap-2 mb-2">
-          <div style="width:28px;height:28px;background:#3b82f6;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700">
-            <span x-text="currentUser ? currentUser.username[0].toUpperCase() : 'U'"></span>
-          </div>
-          <div>
-            <div style="color:#e2e8f0;font-weight:600" x-text="currentUser ? currentUser.username : ''"></div>
-            <div style="color:#64748b" x-text="currentUser ? currentUser.role : ''"></div>
+      <!-- User -->
+      <div class="sidebar-user">
+        <div class="user-row mb-2">
+          <div class="user-avatar" x-text="currentUser ? currentUser.username[0].toUpperCase() : 'U'"></div>
+          <div class="user-info">
+            <div class="user-name" x-text="currentUser ? currentUser.username : ''"></div>
+            <div class="user-role" x-text="currentUser ? currentUser.role : ''"></div>
           </div>
         </div>
-        <button @click="logout()" class="btn btn-secondary btn-sm w-full">
-          <i class="fas fa-right-from-bracket mr-1"></i> Sair
+        <button @click="logout()" class="btn btn-secondary btn-sm w-full" style="justify-content:center">
+          <i class="fas fa-right-from-bracket"></i><span> Sair</span>
         </button>
       </div>
-    </div>
+    </aside>
 
-    <!-- CONTENT -->
-    <div class="main-content p-4">
+    <!-- ── Main wrap ────────────────────────────────────────────── -->
+    <div class="main-wrap">
 
-      <!-- DASHBOARD -->
-      <div x-show="page === 'dashboard'">
-        <h2 class="mb-4" style="color:#e2e8f0;font-weight:700"><i class="fas fa-gauge-high mr-2" style="color:#3b82f6"></i>Dashboard</h2>
-        <div class="grid grid-cols-4 gap-3 mb-4">
-          <div class="stat-card">
-            <div style="color:#64748b">Total OLTs</div>
-            <div style="font-size:20px!important;font-weight:700;color:#60a5fa" x-text="stats.total_olts || 0"></div>
-          </div>
-          <div class="stat-card">
-            <div style="color:#64748b">OLTs Online</div>
-            <div style="font-size:20px!important;font-weight:700;color:#4ade80" x-text="stats.online_olts || 0"></div>
-          </div>
-          <div class="stat-card">
-            <div style="color:#64748b">Portas PON</div>
-            <div style="font-size:20px!important;font-weight:700;color:#a78bfa" x-text="stats.total_ports || 0"></div>
-          </div>
-          <div class="stat-card">
-            <div style="color:#64748b">Cache Redis</div>
-            <div style="font-size:12px!important;font-weight:700" :class="stats.redis ? 'text-green-400' : 'text-red-400'" x-text="stats.redis ? 'Ativo' : 'Inativo'"></div>
-          </div>
+      <!-- Topbar -->
+      <div class="topbar">
+        <button @click="sidebarCollapsed=!sidebarCollapsed" class="btn btn-ghost btn-icon" title="Recolher menu">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="topbar-title">
+          <i :class="page==='dashboard'?'fas fa-gauge-high':page==='olts'?'fas fa-server':page==='onus'?'fas fa-router':page==='uncfg'?'fas fa-circle-exclamation':page==='search'?'fas fa-magnifying-glass':page==='users'?'fas fa-users':'fas fa-user-gear'"></i>
+          <span x-text="page==='dashboard'?'Dashboard':page==='olts'?'Gerenciamento de OLTs':page==='onus'?'Status das ONUs':page==='uncfg'?'ONUs Não Provisionadas':page==='search'?'Buscar ONU por Serial':page==='users'?'Gerenciamento de Usuários':'Meu Perfil'"></span>
         </div>
-
-        <div class="card">
-          <div class="card-header flex items-center justify-between">
-            <span style="color:#e2e8f0;font-weight:600"><i class="fas fa-server mr-2" style="color:#3b82f6"></i>OLTs Cadastradas</span>
-            <button @click="loadDashboard()" class="btn btn-secondary btn-sm"><i class="fas fa-rotate-right"></i></button>
-          </div>
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nome</th><th>IP</th><th>Protocolo</th><th>Status</th><th>Modelo</th><th>Firmware</th><th>Última Verificação</th><th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="olt in olts" :key="olt.id">
-                  <tr>
-                    <td style="color:#e2e8f0;font-weight:600" x-text="olt.name"></td>
-                    <td style="color:#94a3b8" x-text="olt.ip + ':' + olt.port"></td>
-                    <td><span class="badge badge-blue" x-text="olt.protocol.toUpperCase()"></span></td>
-                    <td>
-                      <span :class="olt.status === 'online' ? 'badge badge-green' : olt.status === 'offline' ? 'badge badge-red' : 'badge badge-gray'" x-text="olt.status"></span>
-                    </td>
-                    <td style="color:#94a3b8" x-text="olt.model || '-'"></td>
-                    <td style="color:#94a3b8" x-text="olt.firmware || '-'"></td>
-                    <td style="color:#64748b" x-text="olt.last_check ? new Date(olt.last_check).toLocaleString('pt-BR') : '-'"></td>
-                    <td>
-                      <button @click="testOLTConnection(olt)" class="btn btn-secondary btn-sm mr-1" title="Testar Conexão"><i class="fas fa-plug"></i></button>
-                      <button @click="openONUPage(olt)" class="btn btn-primary btn-sm" title="Ver ONUs"><i class="fas fa-router"></i></button>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="olts.length === 0">
-                  <td colspan="8" class="text-center py-4" style="color:#64748b">Nenhuma OLT cadastrada. <a href="#" @click="setPage('olts')" style="color:#3b82f6">Cadastrar OLT</a></td>
-                </tr>
-              </tbody>
-            </table>
+        <div class="topbar-actions">
+          <span style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px">
+            <span class="power-dot" :class="stats.redis ? 'power-normal' : 'power-critical'"></span>
+            <span x-text="stats.redis ? 'Redis Online' : 'Redis Offline'"></span>
+          </span>
+          <div style="width:1px;height:20px;background:var(--border-dim)"></div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div class="user-avatar" style="width:28px;height:28px;font-size:11px" x-text="currentUser ? currentUser.username[0].toUpperCase() : 'U'"></div>
+            <span style="font-size:12px;color:var(--text-secondary)" x-text="currentUser ? currentUser.username : ''"></span>
           </div>
         </div>
       </div>
 
-      <!-- OLTs PAGE -->
-      <div x-show="page === 'olts'">
-        <div class="flex items-center justify-between mb-4">
-          <h2 style="color:#e2e8f0;font-weight:700"><i class="fas fa-server mr-2" style="color:#3b82f6"></i>Gerenciamento de OLTs</h2>
-          <template x-if="currentUser && currentUser.role === 'admin'">
-            <button @click="openOLTModal()" class="btn btn-primary"><i class="fas fa-plus mr-1"></i>Nova OLT</button>
-          </template>
-        </div>
+      <!-- ── Content ──────────────────────────────────────────── -->
+      <div class="main-content">
 
-        <div class="card">
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nome</th><th>IP</th><th>Porta</th><th>Protocolo</th><th>Usuário</th><th>Status</th><th>Portas PON</th><th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="olt in olts" :key="olt.id">
-                  <tr>
-                    <td style="color:#e2e8f0;font-weight:600" x-text="olt.name"></td>
-                    <td style="color:#94a3b8" x-text="olt.ip"></td>
-                    <td style="color:#94a3b8" x-text="olt.port"></td>
-                    <td><span class="badge badge-blue" x-text="olt.protocol.toUpperCase()"></span></td>
-                    <td style="color:#94a3b8" x-text="olt.username"></td>
-                    <td>
-                      <span :class="olt.status === 'online' ? 'badge badge-green' : olt.status === 'offline' ? 'badge badge-red' : 'badge badge-gray'" x-text="olt.status"></span>
-                    </td>
-                    <td>
-                      <button @click="loadOLTPorts(olt)" class="btn btn-secondary btn-sm"><i class="fas fa-list mr-1"></i>Ver Portas</button>
-                    </td>
-                    <td class="flex gap-1">
-                      <button @click="testOLTConnection(olt)" class="btn btn-secondary btn-sm" title="Testar"><i class="fas fa-plug"></i></button>
-                      <template x-if="currentUser && currentUser.role === 'admin'">
-                        <button @click="discoverOLT(olt)" class="btn btn-warning btn-sm" title="Descobrir Portas"><i class="fas fa-radar"></i></button>
-                      </template>
-                      <template x-if="currentUser && currentUser.role === 'admin'">
-                        <button @click="editOLT(olt)" class="btn btn-primary btn-sm" title="Editar"><i class="fas fa-pen"></i></button>
-                      </template>
-                      <template x-if="currentUser && currentUser.role === 'admin'">
-                        <button @click="deleteOLT(olt)" class="btn btn-danger btn-sm" title="Excluir"><i class="fas fa-trash"></i></button>
-                      </template>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="olts.length === 0">
-                  <td colspan="8" class="text-center py-4" style="color:#64748b">Nenhuma OLT cadastrada.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Ports Panel -->
-        <div x-show="selectedOLTPorts !== null" class="card mt-4">
-          <div class="card-header flex items-center justify-between">
-            <span style="color:#e2e8f0;font-weight:600">
-              <i class="fas fa-ethernet mr-2" style="color:#a78bfa"></i>
-              Portas PON - <span x-text="selectedOLTForPorts ? selectedOLTForPorts.name : ''"></span>
-              <span x-show="selectedOLTPorts" style="color:#94a3b8;font-weight:400" x-text="' (' + (selectedOLTPorts ? selectedOLTPorts.length : 0) + ' portas)'"></span>
-            </span>
-            <button @click="selectedOLTPorts=null" class="btn btn-secondary btn-sm"><i class="fas fa-times"></i></button>
-          </div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Interface</th><th>Slot</th><th>Card</th><th>PON</th><th>Tipo</th><th>Status</th><th>ONUs</th><th>Ações</th></tr></thead>
-               <tbody>
-                 <template x-for="p in selectedOLTPorts" :key="p.id">
-                   <tr>
-                     <td><code x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.pon" style="color:#60a5fa"></code></td>
-                     <td x-text="p.slot"></td>
-                     <td x-text="p.card || 1"></td>
-                     <td x-text="p.pon"></td>
-                    <td><span class="badge badge-blue" x-text="p.port_type ? p.port_type.toUpperCase() : 'GPON'"></span></td>
-                    <td>
-                      <span :class="p.status==='online'?'badge badge-green':(p.status==='active'?'badge badge-blue':'badge badge-gray')" x-text="p.status"></span>
-                    </td>
-                    <td x-text="p.onu_count"></td>
-                    <td>
-                      <button @click="openONUsByPort(selectedOLTForPorts, p)" class="btn btn-primary btn-sm">
-                        <i class="fas fa-router mr-1"></i>Ver ONUs
-                      </button>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="!selectedOLTPorts || selectedOLTPorts.length === 0">
-                  <td colspan="8" class="text-center py-3" style="color:#64748b">Nenhuma porta descoberta. Execute a descoberta primeiro.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ONUs PAGE -->
-      <div x-show="page === 'onus'">
-        <div class="flex items-center justify-between mb-4">
-          <h2 style="color:#e2e8f0;font-weight:700"><i class="fas fa-router mr-2" style="color:#3b82f6"></i>Status das ONUs</h2>
-          <div class="flex gap-2">
-            <select x-model="onuFilter.olt_id" @change="onuFilter.slot='';onuFilter.port='';loadOLTPortsForFilter()" class="input-field" style="width:160px">
-              <option value="">Selecione a OLT</option>
-              <template x-for="olt in olts" :key="olt.id">
-                <option :value="olt.id" x-text="olt.name"></option>
-              </template>
-            </select>
-            <select x-model="onuFilter.port_id" class="input-field" style="width:140px" :disabled="!onuFilter.olt_id">
-              <option value="">Selecione a PON</option>
-              <template x-for="p in filteredPorts" :key="p.id">
-                <option :value="p.id + '|' + p.slot + '|' + (p.card||1) + '|' + p.pon" x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.pon+' ('+p.onu_count+' ONUs)'" ></option>
-              </template>
-            </select>
-            <button @click="loadONUStatus(false)" class="btn btn-primary" :disabled="!onuFilter.port_id">
-              <i class="fas fa-search mr-1"></i>Consultar
-            </button>
-            <button @click="loadONUStatus(true)" class="btn btn-warning btn-sm" :disabled="!onuFilter.port_id" title="Forçar atualização (ignora cache)">
-              <i class="fas fa-rotate-right mr-1"></i>Atualizar
-            </button>
-          </div>
-        </div>
-
-        <!-- Cache Info -->
-        <div x-show="onuStatusData && onuStatusData.cached" class="mb-3 flex items-center gap-2" style="color:#fbbf24">
-          <i class="fas fa-database"></i>
-          <span>Dados do cache Redis — expira em: <strong x-text="onuStatusData ? onuStatusData.cache_expires_in : ''"></strong></span>
-          <button @click="loadONUStatus(true)" class="btn btn-warning btn-sm ml-2"><i class="fas fa-rotate-right mr-1"></i>Atualizar Agora</button>
-        </div>
-
-        <!-- Stats Bar -->
-        <div x-show="onuStatusData" class="grid grid-cols-4 gap-3 mb-4">
-          <div class="stat-card">
-            <div style="color:#64748b">Total ONUs</div>
-            <div style="font-size:18px!important;font-weight:700;color:#60a5fa" x-text="onuStatusData ? onuStatusData.total : 0"></div>
-          </div>
-          <div class="stat-card">
-            <div style="color:#64748b">Online</div>
-            <div style="font-size:18px!important;font-weight:700;color:#4ade80" x-text="onuStatusData ? onuStatusData.online : 0"></div>
-          </div>
-          <div class="stat-card">
-            <div style="color:#64748b">Offline</div>
-            <div style="font-size:18px!important;font-weight:700;color:#f87171" x-text="onuStatusData ? onuStatusData.offline : 0"></div>
-          </div>
-          <div class="stat-card">
-            <div style="color:#64748b">Outros</div>
-            <div style="font-size:18px!important;font-weight:700;color:#fbbf24" x-text="onuStatusData ? (onuStatusData.total - onuStatusData.online - onuStatusData.offline) : 0"></div>
-          </div>
-        </div>
-
-        <!-- Filter bar -->
-        <div x-show="onuStatusData" class="flex gap-2 mb-3">
-          <input x-model="onuSearch" type="text" class="input-field" placeholder="Filtrar por índice, causa..." style="width:220px" />
-          <select x-model="onuStateFilter" class="input-field" style="width:140px">
-            <option value="">Todos os estados</option>
-            <option value="working">Online (working)</option>
-            <option value="disable">Offline (disable)</option>
-            <option value="initial">Iniciando</option>
-            <option value="ranging">Ranging</option>
-          </select>
-          <button @click="printONUTable()" class="btn btn-secondary btn-sm"><i class="fas fa-print mr-1"></i>Imprimir</button>
-        </div>
-
-        <div x-show="onuLoading" class="text-center py-8"><div class="loading" style="width:24px;height:24px;border-width:3px"></div><div class="mt-2" style="color:#64748b">Consultando OLT...</div></div>
-
-        <div x-show="onuStatusData && !onuLoading" class="card" id="onu-table">
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Índice ONU</th><th>Serial</th><th>Tipo</th><th>Descrição</th><th>Admin</th><th>Estado</th><th>Última Queda</th><th>RX OLT</th><th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="onu in filteredONUs" :key="onu.onu_index">
-                  <tr :class="onu.oper_state === 'working' ? 'onu-row-online' : onu.oper_state === 'disable' ? 'onu-row-offline' : 'onu-row-warning'">
-                    <td style="color:#e2e8f0;font-weight:600;font-family:monospace" x-text="onu.onu_index"></td>
-                    <td style="font-family:monospace;color:#fbbf24" x-text="onu.serial || '-'"></td>
-                    <td style="color:#94a3b8" x-text="onu.onu_type || '-'"></td>
-                    <td style="color:#94a3b8;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="onu.description" x-text="onu.description || '-'"></td>
-                    <td><span :class="onu.admin_state === 'enable' ? 'badge badge-green' : 'badge badge-red'" x-text="onu.admin_state"></span></td>
-                    <td>
-                      <span :class="onu.oper_state === 'working' ? 'badge badge-green' : onu.oper_state === 'disable' ? 'badge badge-red' : 'badge badge-yellow'" x-text="onu.oper_state"></span>
-                    </td>
-                    <td>
-                      <span x-show="onu.last_down_cause" :class="onu.last_down_cause === 'LOSi' || onu.last_down_cause === 'LOS' || onu.last_down_cause === 'LOF' ? 'badge badge-red' : onu.last_down_cause === 'DyingGasp' || onu.last_down_cause === 'PowerOff' ? 'badge badge-yellow' : 'badge badge-gray'" x-text="onu.last_down_cause"></span>
-                      <span x-show="!onu.last_down_cause" style="color:#475569">-</span>
-                    </td>
-                    <td>
-                      <span x-show="onu.olt_rx_power !== null && onu.olt_rx_power !== undefined" style="font-family:monospace" x-text="onu.olt_rx_power ? onu.olt_rx_power.toFixed(2) + ' dBm' : '-'"></span>
-                      <span x-show="onu.olt_rx_power === null || onu.olt_rx_power === undefined" style="color:#475569">-</span>
-                    </td>
-                    <td>
-                      <button @click="openONUDetail(onu)" class="btn btn-primary btn-sm"><i class="fas fa-info-circle mr-1"></i>Detalhes</button>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="filteredONUs.length === 0 && onuStatusData">
-                  <td colspan="7" class="text-center py-4" style="color:#64748b">Nenhuma ONU encontrada com os filtros aplicados.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div x-show="!onuStatusData && !onuLoading" class="text-center py-12" style="color:#475569">
-          <i class="fas fa-router text-3xl mb-3" style="color:#334155"></i>
-          <div>Selecione uma OLT e uma porta PON para consultar as ONUs.</div>
-        </div>
-      </div>
-
-      <!-- UNCONFIGURED ONUs -->
-      <div x-show="page === 'uncfg'">
-        <div class="flex items-center justify-between mb-4">
-          <h2 style="color:#e2e8f0;font-weight:700"><i class="fas fa-circle-exclamation mr-2" style="color:#f59e0b"></i>ONUs Não Provisionadas</h2>
-          <div class="flex gap-2">
-            <select x-model="uncfgOltId" class="input-field" style="width:160px">
-              <option value="">Selecione a OLT</option>
-              <template x-for="olt in olts" :key="olt.id">
-                <option :value="olt.id" x-text="olt.name"></option>
-              </template>
-            </select>
-            <button @click="loadUncfgONUs(false)" class="btn btn-primary" :disabled="!uncfgOltId"><i class="fas fa-search mr-1"></i>Consultar</button>
-            <button @click="loadUncfgONUs(true)" class="btn btn-warning btn-sm" :disabled="!uncfgOltId"><i class="fas fa-rotate-right"></i></button>
-          </div>
-        </div>
-
-        <div x-show="uncfgLoading" class="text-center py-8"><div class="loading" style="width:24px;height:24px;border-width:3px"></div></div>
-
-        <div x-show="uncfgData && !uncfgLoading" class="card">
-          <div class="card-header">
-            <span style="color:#e2e8f0;font-weight:600">ONUs aguardando provisionamento: <strong x-text="uncfgData ? uncfgData.total : 0" style="color:#fbbf24"></strong></span>
-          </div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Índice ONU</th><th>Número de Série</th></tr></thead>
-              <tbody>
-                <template x-for="onu in (uncfgData ? uncfgData.onus : [])" :key="onu.onu_index">
-                  <tr>
-                    <td style="font-family:monospace;color:#e2e8f0" x-text="onu.onu_index"></td>
-                    <td style="font-family:monospace;color:#fbbf24" x-text="onu.serial"></td>
-                  </tr>
-                </template>
-                <tr x-show="!uncfgData || uncfgData.onus.length === 0">
-                  <td colspan="2" class="text-center py-4" style="color:#64748b">Nenhuma ONU não provisionada encontrada.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- SEARCH PAGE -->
-      <div x-show="page === 'search'">
-        <h2 class="mb-4" style="color:#e2e8f0;font-weight:700"><i class="fas fa-magnifying-glass mr-2" style="color:#3b82f6"></i>Buscar ONU por Serial</h2>
-        <div class="card p-4 mb-4">
-          <div class="flex gap-3">
-            <select x-model="searchOltId" class="input-field" style="width:160px">
-              <option value="">Selecione a OLT</option>
-              <template x-for="olt in olts" :key="olt.id">
-                <option :value="olt.id" x-text="olt.name"></option>
-              </template>
-            </select>
-            <input x-model="searchSerial" type="text" class="input-field" placeholder="Número de série (ex: ZTEG12345678)" style="width:260px" @keydown.enter="searchONU()" />
-            <button @click="searchONU()" class="btn btn-primary" :disabled="!searchOltId || !searchSerial">
-              <i class="fas fa-search mr-1"></i>Buscar
-            </button>
-          </div>
-        </div>
-
-        <div x-show="searchLoading" class="text-center py-8"><div class="loading" style="width:24px;height:24px;border-width:3px"></div></div>
-
-        <div x-show="searchResults !== null && !searchLoading" class="card">
-          <div class="card-header">
-            <span style="color:#e2e8f0;font-weight:600">Resultados: <strong x-text="searchResults ? searchResults.length : 0" style="color:#60a5fa"></strong></span>
-          </div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Índice ONU</th><th>Serial</th><th>Modelo</th><th>Admin</th><th>Estado</th><th>Slot</th><th>Porta</th><th>Ações</th></tr></thead>
-              <tbody>
-                <template x-for="r in (searchResults || [])" :key="r.onu_index">
-                  <tr>
-                    <td style="font-family:monospace;color:#e2e8f0" x-text="r.onu_index"></td>
-                    <td style="font-family:monospace;color:#fbbf24" x-text="r.serial"></td>
-                    <td x-text="r.model || '-'"></td>
-                    <td><span :class="r.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="r.admin_state"></span></td>
-                    <td><span :class="r.oper_state==='working'?'badge badge-green':r.oper_state==='disable'?'badge badge-red':'badge badge-yellow'" x-text="r.oper_state"></span></td>
-                    <td x-text="r.slot"></td>
-                    <td x-text="r.port"></td>
-                    <td>
-                      <button @click="openONUDetailFromSearch(r)" class="btn btn-primary btn-sm"><i class="fas fa-info-circle mr-1"></i>Detalhes</button>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="!searchResults || searchResults.length === 0">
-                  <td colspan="8" class="text-center py-4" style="color:#64748b">Nenhuma ONU encontrada com esse serial.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- USERS PAGE -->
-      <div x-show="page === 'users'">
-        <div class="flex items-center justify-between mb-4">
-          <h2 style="color:#e2e8f0;font-weight:700"><i class="fas fa-users mr-2" style="color:#3b82f6"></i>Gerenciamento de Usuários</h2>
-          <button @click="openUserModal()" class="btn btn-primary"><i class="fas fa-plus mr-1"></i>Novo Usuário</button>
-        </div>
-        <div class="card">
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Usuário</th><th>Nome</th><th>E-mail</th><th>Perfil</th><th>2FA</th><th>Status</th><th>Último Login</th><th>Ações</th></tr></thead>
-              <tbody>
-                <template x-for="u in users" :key="u.id">
-                  <tr>
-                    <td style="color:#e2e8f0;font-weight:600" x-text="u.username"></td>
-                    <td x-text="u.full_name || '-'"></td>
-                    <td x-text="u.email || '-'"></td>
-                    <td><span :class="u.role==='admin'?'badge badge-blue':'badge badge-gray'" x-text="u.role"></span></td>
-                    <td><span :class="u.is_2fa_enabled?'badge badge-green':'badge badge-gray'" x-text="u.is_2fa_enabled ? 'Ativo' : 'Inativo'"></span></td>
-                    <td><span :class="u.is_active?'badge badge-green':'badge badge-red'" x-text="u.is_active ? 'Ativo' : 'Inativo'"></span></td>
-                    <td style="color:#64748b" x-text="u.last_login ? new Date(u.last_login).toLocaleString('pt-BR') : '-'"></td>
-                    <td class="flex gap-1">
-                      <button @click="editUser(u)" class="btn btn-primary btn-sm"><i class="fas fa-pen"></i></button>
-                      <button @click="resetUserPassword(u)" class="btn btn-warning btn-sm" title="Redefinir Senha"><i class="fas fa-key"></i></button>
-                      <button @click="deleteUser(u)" class="btn btn-danger btn-sm" :disabled="u.id === currentUser.id"><i class="fas fa-trash"></i></button>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- PROFILE PAGE -->
-      <div x-show="page === 'profile'">
-        <h2 class="mb-4" style="color:#e2e8f0;font-weight:700"><i class="fas fa-user-gear mr-2" style="color:#3b82f6"></i>Meu Perfil</h2>
-        <div class="grid grid-cols-2 gap-4">
-          <!-- Info -->
-          <div class="card p-4">
-            <h3 class="mb-3" style="color:#94a3b8;font-weight:700">Informações da Conta</h3>
-            <div class="detail-grid">
-              <div class="detail-item">
-                <div class="detail-label">Usuário</div>
-                <div class="detail-value" x-text="currentUser ? currentUser.username : ''"></div>
+        <!-- ══════════════ DASHBOARD ══════════════ -->
+        <div x-show="page === 'dashboard'">
+          <div class="page-body">
+            <div class="stat-grid">
+              <div class="stat-card blue">
+                <div class="stat-icon blue"><i class="fas fa-server"></i></div>
+                <div class="stat-label">Total OLTs</div>
+                <div class="stat-value blue" x-text="stats.total_olts || 0"></div>
               </div>
-              <div class="detail-item">
-                <div class="detail-label">Perfil</div>
-                <div class="detail-value" x-text="currentUser ? currentUser.role : ''"></div>
+              <div class="stat-card green">
+                <div class="stat-icon green"><i class="fas fa-circle-check"></i></div>
+                <div class="stat-label">OLTs Online</div>
+                <div class="stat-value green" x-text="stats.online_olts || 0"></div>
               </div>
-              <div class="detail-item">
-                <div class="detail-label">Nome</div>
-                <div class="detail-value" x-text="currentUser ? (currentUser.full_name || '-') : ''"></div>
+              <div class="stat-card purple">
+                <div class="stat-icon purple"><i class="fas fa-ethernet"></i></div>
+                <div class="stat-label">Portas PON</div>
+                <div class="stat-value purple" x-text="stats.total_ports || 0"></div>
               </div>
-              <div class="detail-item">
-                <div class="detail-label">E-mail</div>
-                <div class="detail-value" x-text="currentUser ? (currentUser.email || '-') : ''"></div>
+              <div class="stat-card" :class="stats.redis ? 'green' : 'red'">
+                <div class="stat-icon" :class="stats.redis ? 'green' : 'red'"><i class="fas fa-database"></i></div>
+                <div class="stat-label">Cache Redis</div>
+                <div class="stat-value" :class="stats.redis ? 'green' : 'red'" x-text="stats.redis ? 'Ativo' : 'Inativo'"></div>
               </div>
-              <div class="detail-item">
-                <div class="detail-label">2FA</div>
-                <div class="detail-value">
-                  <span :class="currentUser && currentUser.is_2fa_enabled ? 'badge badge-green' : 'badge badge-red'" x-text="currentUser && currentUser.is_2fa_enabled ? 'Ativado' : 'Desativado'"></span>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <span><i class="fas fa-server mr-2" style="color:var(--accent)"></i>OLTs Cadastradas</span>
+                <button @click="loadDashboard()" class="btn btn-ghost btn-xs"><i class="fas fa-rotate-right"></i></button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Nome</th><th>IP</th><th>Protocolo</th><th>Status</th><th>Modelo</th><th>Firmware</th><th>Última Verificação</th><th>Ações</th></tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="olt in olts" :key="olt.id">
+                      <tr>
+                        <td class="td-primary" x-text="olt.name"></td>
+                        <td class="td-mono" x-text="olt.ip + ':' + olt.port"></td>
+                        <td><span class="badge badge-blue" x-text="olt.protocol.toUpperCase()"></span></td>
+                        <td><span :class="olt.status==='online'?'badge badge-green':olt.status==='offline'?'badge badge-red':'badge badge-gray'" x-text="olt.status"></span></td>
+                        <td x-text="olt.model || '—'"></td>
+                        <td x-text="olt.firmware || '—'"></td>
+                        <td x-text="olt.last_check ? new Date(olt.last_check).toLocaleString('pt-BR') : '—'"></td>
+                        <td>
+                          <div style="display:flex;gap:4px">
+                            <button @click="testOLTConnection(olt)" class="btn btn-ghost btn-xs" title="Testar Conexão"><i class="fas fa-plug"></i></button>
+                            <button @click="openONUPage(olt)" class="btn btn-primary btn-xs"><i class="fas fa-router mr-1"></i>Ver ONUs</button>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="olts.length === 0">
+                      <td colspan="8">
+                        <div class="empty-state" style="padding:32px">
+                          <i class="fas fa-server"></i>
+                          <p>Nenhuma OLT cadastrada. <a href="#" @click="setPage('olts')" style="color:var(--accent)">Cadastrar OLT</a></p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════ OLTs PAGE ══════════════ -->
+        <div x-show="page === 'olts'">
+          <div class="page-body">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+              <template x-if="currentUser && currentUser.role === 'admin'">
+                <button @click="openOLTModal()" class="btn btn-primary"><i class="fas fa-plus"></i> Nova OLT</button>
+              </template>
+            </div>
+            <div class="card mb-4">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Nome</th><th>IP</th><th>Porta</th><th>Protocolo</th><th>Usuário</th><th>Status</th><th>Portas PON</th><th>Ações</th></tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="olt in olts" :key="olt.id">
+                      <tr>
+                        <td class="td-primary" x-text="olt.name"></td>
+                        <td class="td-mono" x-text="olt.ip"></td>
+                        <td x-text="olt.port"></td>
+                        <td><span class="badge badge-blue" x-text="olt.protocol.toUpperCase()"></span></td>
+                        <td x-text="olt.username"></td>
+                        <td><span :class="olt.status==='online'?'badge badge-green':olt.status==='offline'?'badge badge-red':'badge badge-gray'" x-text="olt.status"></span></td>
+                        <td>
+                          <button @click="loadOLTPorts(olt)" class="btn btn-ghost btn-xs"><i class="fas fa-list mr-1"></i>Ver Portas</button>
+                        </td>
+                        <td>
+                          <div style="display:flex;gap:4px">
+                            <button @click="testOLTConnection(olt)" class="btn btn-ghost btn-xs" title="Testar Conexão"><i class="fas fa-plug"></i></button>
+                            <template x-if="currentUser && currentUser.role === 'admin'">
+                              <button @click="discoverOLT(olt)" class="btn btn-warning btn-xs" title="Descobrir Portas"><i class="fas fa-radar"></i></button>
+                            </template>
+                            <template x-if="currentUser && currentUser.role === 'admin'">
+                              <button @click="editOLT(olt)" class="btn btn-primary btn-xs" title="Editar"><i class="fas fa-pen"></i></button>
+                            </template>
+                            <template x-if="currentUser && currentUser.role === 'admin'">
+                              <button @click="deleteOLT(olt)" class="btn btn-danger btn-xs" title="Excluir"><i class="fas fa-trash"></i></button>
+                            </template>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="olts.length === 0">
+                      <td colspan="8"><div class="empty-state" style="padding:32px"><i class="fas fa-server"></i><p>Nenhuma OLT cadastrada.</p></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Ports Panel -->
+            <div x-show="selectedOLTPorts !== null" class="card">
+              <div class="card-header">
+                <span>
+                  <i class="fas fa-ethernet mr-2" style="color:var(--purple)"></i>
+                  Portas PON — <strong x-text="selectedOLTForPorts ? selectedOLTForPorts.name : ''"></strong>
+                  <span style="color:var(--text-muted);font-weight:400" x-text="' (' + (selectedOLTPorts ? selectedOLTPorts.length : 0) + ' portas)'"></span>
+                </span>
+                <button @click="selectedOLTPorts=null" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Interface</th><th>Slot</th><th>Card</th><th>PON</th><th>Tipo</th><th>Status</th><th>ONUs</th><th>Ações</th></tr></thead>
+                  <tbody>
+                    <template x-for="p in selectedOLTPorts" :key="p.id">
+                      <tr>
+                        <td class="td-mono" style="color:#79c0ff" x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.pon"></td>
+                        <td x-text="p.slot"></td>
+                        <td x-text="p.card || 1"></td>
+                        <td x-text="p.pon"></td>
+                        <td><span class="badge badge-blue" x-text="p.port_type ? p.port_type.toUpperCase() : 'GPON'"></span></td>
+                        <td><span :class="p.status==='online'?'badge badge-green':p.status==='active'?'badge badge-blue':'badge badge-gray'" x-text="p.status"></span></td>
+                        <td>
+                          <span style="font-weight:700;color:var(--text-primary)" x-text="p.onu_count"></span>
+                          <span style="color:var(--text-muted)"> ONUs</span>
+                        </td>
+                        <td>
+                          <button @click="openONUsByPort(selectedOLTForPorts, p)" class="btn btn-primary btn-xs">
+                            <i class="fas fa-router"></i> Ver ONUs
+                          </button>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="!selectedOLTPorts || selectedOLTPorts.length === 0">
+                      <td colspan="8"><div class="empty-state" style="padding:28px"><i class="fas fa-ethernet"></i><p>Nenhuma porta descoberta. Execute a descoberta primeiro.</p></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════ ONUs PAGE ══════════════ -->
+        <div x-show="page === 'onus'">
+          <div class="page-body">
+            <!-- Filter bar -->
+            <div class="card card-body mb-4">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div style="flex:0 0 auto">
+                  <label class="form-label">OLT</label>
+                  <select x-model="onuFilter.olt_id" @change="onuFilter.port_id='';loadOLTPortsForFilter()" class="input-field" style="width:170px">
+                    <option value="">Selecione a OLT</option>
+                    <template x-for="olt in olts" :key="olt.id">
+                      <option :value="olt.id" x-text="olt.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div style="flex:1;min-width:200px">
+                  <label class="form-label">Porta PON</label>
+                  <select x-model="onuFilter.port_id" class="input-field" :disabled="!onuFilter.olt_id">
+                    <option value="">Selecione a PON</option>
+                    <template x-for="p in filteredPorts" :key="p.id">
+                      <option :value="p.id + '|' + p.slot + '|' + (p.card||1) + '|' + p.pon"
+                              x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.pon+' ('+p.onu_count+' ONUs)'"></option>
+                    </template>
+                  </select>
+                </div>
+                <div style="display:flex;gap:6px;align-items:flex-end;padding-bottom:0">
+                  <button @click="loadONUStatus(false)" class="btn btn-primary" :disabled="!onuFilter.port_id">
+                    <i class="fas fa-search"></i> Consultar
+                  </button>
+                  <button @click="loadONUStatus(true)" class="btn btn-warning btn-sm" :disabled="!onuFilter.port_id" title="Forçar atualização">
+                    <i class="fas fa-rotate-right"></i>
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- 2FA Setup -->
-          <div class="card p-4">
-            <h3 class="mb-3" style="color:#94a3b8;font-weight:700">Autenticação de Dois Fatores</h3>
-            <div x-show="!currentUser || !currentUser.is_2fa_enabled">
-              <p class="mb-3" style="color:#94a3b8">Ative o 2FA para aumentar a segurança da sua conta.</p>
-              <button @click="setup2FA()" class="btn btn-success"><i class="fas fa-shield-halved mr-1"></i>Configurar 2FA</button>
+            <!-- Cache Info -->
+            <div x-show="onuStatusData && onuStatusData.cached" class="cache-bar">
+              <i class="fas fa-database"></i>
+              <span>Dados do cache Redis — expira em: <strong x-text="onuStatusData ? onuStatusData.cache_expires_in : ''"></strong></span>
+              <button @click="loadONUStatus(true)" class="btn btn-warning btn-xs" style="margin-left:auto"><i class="fas fa-rotate-right mr-1"></i>Atualizar</button>
             </div>
-            <div x-show="currentUser && currentUser.is_2fa_enabled">
-              <p class="mb-3" style="color:#4ade80"><i class="fas fa-check-circle mr-1"></i>2FA está ativo na sua conta.</p>
-              <button @click="disable2FAModal=true" class="btn btn-danger btn-sm"><i class="fas fa-shield-xmark mr-1"></i>Desativar 2FA</button>
-            </div>
-          </div>
 
-          <!-- Change Password -->
-          <div class="card p-4">
-            <h3 class="mb-3" style="color:#94a3b8;font-weight:700">Alterar Senha</h3>
-            <div class="mb-3">
-              <label class="block mb-1" style="color:#64748b">Senha Atual</label>
-              <input x-model="changePass.current" type="password" class="input-field" />
+            <!-- Stats -->
+            <div x-show="onuStatusData" class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+              <div class="stat-card blue">
+                <div class="stat-icon blue"><i class="fas fa-router"></i></div>
+                <div class="stat-label">Total</div>
+                <div class="stat-value blue" x-text="onuStatusData ? onuStatusData.total : 0"></div>
+              </div>
+              <div class="stat-card green">
+                <div class="stat-icon green"><i class="fas fa-circle-check"></i></div>
+                <div class="stat-label">Online</div>
+                <div class="stat-value green" x-text="onuStatusData ? onuStatusData.online : 0"></div>
+              </div>
+              <div class="stat-card red">
+                <div class="stat-icon red"><i class="fas fa-circle-xmark"></i></div>
+                <div class="stat-label">Offline</div>
+                <div class="stat-value red" x-text="onuStatusData ? onuStatusData.offline : 0"></div>
+              </div>
+              <div class="stat-card yellow">
+                <div class="stat-icon yellow"><i class="fas fa-triangle-exclamation"></i></div>
+                <div class="stat-label">Outros</div>
+                <div class="stat-value yellow" x-text="onuStatusData ? (onuStatusData.total - onuStatusData.online - onuStatusData.offline) : 0"></div>
+              </div>
             </div>
-            <div class="mb-3">
-              <label class="block mb-1" style="color:#64748b">Nova Senha</label>
-              <input x-model="changePass.new" type="password" class="input-field" />
+
+            <!-- Filter bar -->
+            <div x-show="onuStatusData" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+              <div style="position:relative;flex:1;min-width:180px">
+                <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:11px"></i>
+                <input x-model="onuSearch" type="text" class="input-field" placeholder="Filtrar por índice, serial, modelo..."
+                       style="padding-left:30px" />
+              </div>
+              <select x-model="onuStateFilter" class="input-field" style="width:180px">
+                <option value="">Todos os estados</option>
+                <option value="working">Online (working)</option>
+                <option value="disable">Offline (disable)</option>
+                <option value="initial">Iniciando</option>
+                <option value="ranging">Ranging</option>
+              </select>
+              <button @click="printONUTable()" class="btn btn-ghost btn-sm"><i class="fas fa-print mr-1"></i>Imprimir</button>
+              <span x-show="onuStatusData" style="color:var(--text-muted);font-size:11.5px;margin-left:4px">
+                <strong style="color:var(--text-secondary)" x-text="filteredONUs.length"></strong> resultado(s)
+                <span style="color:var(--text-muted)" x-text="onuStatusData ? ' · ' + onuStatusData.last_updated : ''"></span>
+              </span>
             </div>
-            <button @click="doChangePassword()" class="btn btn-primary"><i class="fas fa-lock mr-1"></i>Alterar Senha</button>
+
+            <div x-show="onuLoading" class="empty-state">
+              <div class="spinner spinner-lg" style="margin:0 auto 16px"></div>
+              <p>Consultando OLT via Telnet...</p>
+            </div>
+
+            <div x-show="onuStatusData && !onuLoading" class="card" id="onu-table">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Índice ONU</th><th>Serial</th><th>Tipo/Modelo</th><th>Descrição</th><th>Admin</th><th>Estado</th><th>Última Queda</th><th>RX OLT</th><th>Ações</th></tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="onu in filteredONUs" :key="onu.onu_index">
+                      <tr :class="onu.oper_state==='working'?'onu-online':onu.oper_state==='disable'?'onu-offline':'onu-warning'">
+                        <td class="td-primary td-mono" x-text="onu.onu_index"></td>
+                        <td class="td-mono" style="color:#e3b341" x-text="onu.serial || '—'"></td>
+                        <td x-text="onu.onu_type || onu.model || '—'"></td>
+                        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" :title="onu.description" x-text="onu.description || '—'"></td>
+                        <td><span :class="onu.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="onu.admin_state"></span></td>
+                        <td><span :class="onu.oper_state==='working'?'badge badge-green':onu.oper_state==='disable'?'badge badge-red':'badge badge-yellow'" x-text="onu.oper_state"></span></td>
+                        <td>
+                          <span x-show="onu.last_down_cause"
+                                :class="onu.last_down_cause==='LOSi'||onu.last_down_cause==='LOS'||onu.last_down_cause==='LOF'?'badge badge-red':onu.last_down_cause==='DyingGasp'||onu.last_down_cause==='PowerOff'?'badge badge-yellow':'badge badge-gray'"
+                                x-text="onu.last_down_cause"></span>
+                          <span x-show="!onu.last_down_cause" style="color:var(--text-muted)">—</span>
+                        </td>
+                        <td>
+                          <span x-show="onu.olt_rx_power !== null && onu.olt_rx_power !== undefined" class="td-mono"
+                                :style="onu.olt_rx_power < -27 ? 'color:#ff7b72' : onu.olt_rx_power < -25 ? 'color:#e3b341' : 'color:#56d364'"
+                                x-text="onu.olt_rx_power ? onu.olt_rx_power.toFixed(2) + ' dBm' : '—'"></span>
+                          <span x-show="onu.olt_rx_power === null || onu.olt_rx_power === undefined" style="color:var(--text-muted)">—</span>
+                        </td>
+                        <td>
+                          <button @click="openONUDetail(onu)" class="btn btn-primary btn-xs">
+                            <i class="fas fa-info-circle"></i> Detalhes
+                          </button>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="filteredONUs.length === 0 && onuStatusData">
+                      <td colspan="9"><div class="empty-state" style="padding:28px"><i class="fas fa-router"></i><p>Nenhuma ONU encontrada com os filtros aplicados.</p></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div x-show="!onuStatusData && !onuLoading" class="empty-state">
+              <i class="fas fa-router"></i>
+              <p>Selecione uma OLT e uma porta PON para consultar as ONUs.</p>
+            </div>
           </div>
         </div>
-      </div>
 
-    </div><!-- /main-content -->
-  </div><!-- /main app -->
+        <!-- ══════════════ UNCONFIGURED ══════════════ -->
+        <div x-show="page === 'uncfg'">
+          <div class="page-body">
+            <div class="card card-body mb-4">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div>
+                  <label class="form-label">OLT</label>
+                  <select x-model="uncfgOltId" class="input-field" style="width:170px">
+                    <option value="">Selecione a OLT</option>
+                    <template x-for="olt in olts" :key="olt.id">
+                      <option :value="olt.id" x-text="olt.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div style="display:flex;gap:6px;align-items:flex-end">
+                  <button @click="loadUncfgONUs(false)" class="btn btn-primary" :disabled="!uncfgOltId"><i class="fas fa-search"></i> Consultar</button>
+                  <button @click="loadUncfgONUs(true)" class="btn btn-warning btn-sm" :disabled="!uncfgOltId" title="Forçar atualização"><i class="fas fa-rotate-right"></i></button>
+                </div>
+              </div>
+            </div>
 
-  <!-- ============================================================ -->
-  <!-- MODALS -->
-  <!-- ============================================================ -->
+            <div x-show="uncfgLoading" class="empty-state"><div class="spinner spinner-lg" style="margin:0 auto"></div></div>
+
+            <div x-show="uncfgData && !uncfgLoading" class="card">
+              <div class="card-header">
+                <span><i class="fas fa-circle-exclamation mr-2" style="color:var(--yellow)"></i>ONUs aguardando provisionamento</span>
+                <span class="badge badge-yellow" x-text="uncfgData ? uncfgData.total : 0"></span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Índice ONU</th><th>Número de Série</th></tr></thead>
+                  <tbody>
+                    <template x-for="onu in (uncfgData ? uncfgData.onus : [])" :key="onu.onu_index">
+                      <tr>
+                        <td class="td-mono td-primary" x-text="onu.onu_index"></td>
+                        <td class="td-mono" style="color:#e3b341" x-text="onu.serial"></td>
+                      </tr>
+                    </template>
+                    <tr x-show="!uncfgData || uncfgData.onus.length === 0">
+                      <td colspan="2"><div class="empty-state" style="padding:28px"><i class="fas fa-circle-check"></i><p>Nenhuma ONU não provisionada encontrada.</p></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════ SEARCH ══════════════ -->
+        <div x-show="page === 'search'">
+          <div class="page-body">
+            <div class="card card-body mb-4">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div>
+                  <label class="form-label">OLT</label>
+                  <select x-model="searchOltId" class="input-field" style="width:170px">
+                    <option value="">Selecione a OLT</option>
+                    <template x-for="olt in olts" :key="olt.id">
+                      <option :value="olt.id" x-text="olt.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div style="flex:1;min-width:200px">
+                  <label class="form-label">Número de Série</label>
+                  <input x-model="searchSerial" type="text" class="input-field" placeholder="Ex: ZTEG12345678" @keydown.enter="searchONU()" />
+                </div>
+                <button @click="searchONU()" class="btn btn-primary" :disabled="!searchOltId || !searchSerial" style="align-self:flex-end">
+                  <i class="fas fa-search"></i> Buscar
+                </button>
+              </div>
+            </div>
+
+            <div x-show="searchLoading" class="empty-state"><div class="spinner spinner-lg" style="margin:0 auto"></div></div>
+
+            <div x-show="searchResults !== null && !searchLoading" class="card">
+              <div class="card-header">
+                <span>Resultados</span>
+                <span class="badge badge-blue" x-text="searchResults ? searchResults.length : 0"></span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Índice ONU</th><th>Serial</th><th>Modelo</th><th>Admin</th><th>Estado</th><th>Slot</th><th>Porta</th><th>Ações</th></tr></thead>
+                  <tbody>
+                    <template x-for="r in (searchResults || [])" :key="r.onu_index">
+                      <tr>
+                        <td class="td-mono td-primary" x-text="r.onu_index"></td>
+                        <td class="td-mono" style="color:#e3b341" x-text="r.serial"></td>
+                        <td x-text="r.model || '—'"></td>
+                        <td><span :class="r.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="r.admin_state"></span></td>
+                        <td><span :class="r.oper_state==='working'?'badge badge-green':r.oper_state==='disable'?'badge badge-red':'badge badge-yellow'" x-text="r.oper_state"></span></td>
+                        <td x-text="r.slot"></td>
+                        <td x-text="r.port"></td>
+                        <td><button @click="openONUDetailFromSearch(r)" class="btn btn-primary btn-xs"><i class="fas fa-info-circle mr-1"></i>Detalhes</button></td>
+                      </tr>
+                    </template>
+                    <tr x-show="!searchResults || searchResults.length === 0">
+                      <td colspan="8"><div class="empty-state" style="padding:28px"><i class="fas fa-magnifying-glass"></i><p>Nenhuma ONU encontrada com esse serial.</p></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════ USERS ══════════════ -->
+        <div x-show="page === 'users'">
+          <div class="page-body">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+              <button @click="openUserModal()" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Usuário</button>
+            </div>
+            <div class="card">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Usuário</th><th>Nome</th><th>E-mail</th><th>Perfil</th><th>2FA</th><th>Status</th><th>Último Login</th><th>Ações</th></tr></thead>
+                  <tbody>
+                    <template x-for="u in users" :key="u.id">
+                      <tr>
+                        <td class="td-primary" x-text="u.username"></td>
+                        <td x-text="u.full_name || '—'"></td>
+                        <td x-text="u.email || '—'"></td>
+                        <td><span :class="u.role==='admin'?'badge badge-blue':'badge badge-gray'" x-text="u.role"></span></td>
+                        <td><span :class="u.is_2fa_enabled?'badge badge-green':'badge badge-gray'" x-text="u.is_2fa_enabled ? 'Ativo' : 'Inativo'"></span></td>
+                        <td><span :class="u.is_active?'badge badge-green':'badge badge-red'" x-text="u.is_active ? 'Ativo' : 'Inativo'"></span></td>
+                        <td x-text="u.last_login ? new Date(u.last_login).toLocaleString('pt-BR') : '—'"></td>
+                        <td>
+                          <div style="display:flex;gap:4px">
+                            <button @click="editUser(u)" class="btn btn-primary btn-xs" title="Editar"><i class="fas fa-pen"></i></button>
+                            <button @click="resetUserPassword(u)" class="btn btn-warning btn-xs" title="Redefinir Senha"><i class="fas fa-key"></i></button>
+                            <button @click="deleteUser(u)" class="btn btn-danger btn-xs" :disabled="u.id === currentUser.id" title="Excluir"><i class="fas fa-trash"></i></button>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════ PROFILE ══════════════ -->
+        <div x-show="page === 'profile'">
+          <div class="page-body">
+            <div class="grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+              <div class="card card-body">
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px"><i class="fas fa-id-card mr-1"></i>Informações da Conta</div>
+                <div class="detail-grid">
+                  <div class="detail-item"><div class="detail-label">Usuário</div><div class="detail-value" x-text="currentUser ? currentUser.username : ''"></div></div>
+                  <div class="detail-item"><div class="detail-label">Perfil</div><div class="detail-value"><span :class="currentUser && currentUser.role==='admin'?'badge badge-blue':'badge badge-gray'" x-text="currentUser ? currentUser.role : ''"></span></div></div>
+                  <div class="detail-item"><div class="detail-label">Nome</div><div class="detail-value" x-text="currentUser ? (currentUser.full_name || '—') : ''"></div></div>
+                  <div class="detail-item"><div class="detail-label">E-mail</div><div class="detail-value" x-text="currentUser ? (currentUser.email || '—') : ''"></div></div>
+                  <div class="detail-item" style="grid-column:span 2"><div class="detail-label">2FA</div><div class="detail-value"><span :class="currentUser && currentUser.is_2fa_enabled ? 'badge badge-green' : 'badge badge-red'" x-text="currentUser && currentUser.is_2fa_enabled ? 'Ativado' : 'Desativado'"></span></div></div>
+                </div>
+              </div>
+
+              <div class="card card-body">
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px"><i class="fas fa-shield-halved mr-1"></i>Autenticação de Dois Fatores</div>
+                <div x-show="!currentUser || !currentUser.is_2fa_enabled">
+                  <p style="color:var(--text-secondary);font-size:12px;margin-bottom:12px">Ative o 2FA para aumentar a segurança da sua conta com autenticação TOTP.</p>
+                  <button @click="setup2FA()" class="btn btn-success"><i class="fas fa-shield-halved mr-1"></i>Configurar 2FA</button>
+                </div>
+                <div x-show="currentUser && currentUser.is_2fa_enabled">
+                  <p style="color:#56d364;font-size:12px;margin-bottom:12px"><i class="fas fa-check-circle mr-1"></i>2FA está ativo e protegendo sua conta.</p>
+                  <button @click="disable2FAModal=true" class="btn btn-danger btn-sm"><i class="fas fa-shield-xmark mr-1"></i>Desativar 2FA</button>
+                </div>
+              </div>
+
+              <div class="card card-body">
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px"><i class="fas fa-lock mr-1"></i>Alterar Senha</div>
+                <div class="mb-3"><label class="form-label">Senha Atual</label><input x-model="changePass.current" type="password" class="input-field" /></div>
+                <div class="mb-4"><label class="form-label">Nova Senha</label><input x-model="changePass.new" type="password" class="input-field" /></div>
+                <button @click="doChangePassword()" class="btn btn-primary"><i class="fas fa-lock mr-1"></i>Alterar Senha</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /main-content -->
+    </div><!-- /main-wrap -->
+  </div><!-- /app-shell -->
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- MODALS                                                         -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
 
   <!-- OLT Modal -->
   <div x-show="oltModal" class="modal-overlay" @click.self="oltModal=false">
     <div class="modal">
-      <h3 class="mb-4" style="color:#e2e8f0;font-weight:700" x-text="oltModalEdit ? 'Editar OLT' : 'Nova OLT'"></h3>
+      <div class="modal-header">
+        <div class="modal-title"><i class="fas fa-server"></i> <span x-text="oltModalEdit ? 'Editar OLT' : 'Nova OLT'"></span></div>
+        <button @click="oltModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+      </div>
       <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block mb-1" style="color:#64748b">Nome *</label>
-          <input x-model="oltForm.name" type="text" class="input-field" placeholder="Ex: OLT Principal" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">Endereço IP *</label>
-          <input x-model="oltForm.ip" type="text" class="input-field" placeholder="192.168.1.1" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">Porta</label>
-          <input x-model="oltForm.port" type="number" class="input-field" placeholder="22" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">Protocolo</label>
+        <div><label class="form-label">Nome *</label><input x-model="oltForm.name" type="text" class="input-field" placeholder="Ex: OLT Principal" /></div>
+        <div><label class="form-label">Endereço IP *</label><input x-model="oltForm.ip" type="text" class="input-field" placeholder="192.168.1.1" /></div>
+        <div><label class="form-label">Porta</label><input x-model="oltForm.port" type="number" class="input-field" /></div>
+        <div><label class="form-label">Protocolo</label>
           <select x-model="oltForm.protocol" class="input-field">
-            <option value="ssh">SSH</option>
             <option value="telnet">Telnet</option>
+            <option value="ssh">SSH</option>
           </select>
         </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">Usuário *</label>
-          <input x-model="oltForm.username" type="text" class="input-field" placeholder="admin" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">Senha *</label>
-          <input x-model="oltForm.password" type="password" class="input-field" placeholder="••••••••" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">SNMP Community</label>
-          <input x-model="oltForm.snmp_community" type="text" class="input-field" placeholder="public" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">SNMP Versão</label>
+        <div><label class="form-label">Usuário *</label><input x-model="oltForm.username" type="text" class="input-field" /></div>
+        <div><label class="form-label">Senha *</label><input x-model="oltForm.password" type="password" class="input-field" :placeholder="oltModalEdit ? '(manter atual)' : 'Senha'" /></div>
+        <div><label class="form-label">SNMP Community</label><input x-model="oltForm.snmp_community" type="text" class="input-field" /></div>
+        <div><label class="form-label">SNMP Version</label>
           <select x-model="oltForm.snmp_version" class="input-field">
-            <option value="2c">v2c</option>
-            <option value="3">v3</option>
+            <option value="2c">2c</option>
+            <option value="3">3</option>
           </select>
         </div>
       </div>
-      <div class="flex gap-2 mt-4 justify-end">
-        <button @click="oltModal=false" class="btn btn-secondary">Cancelar</button>
+      <div style="display:flex;gap:8px;margin-top:22px;justify-content:flex-end">
+        <button @click="oltModal=false" class="btn btn-ghost">Cancelar</button>
         <button @click="saveOLT()" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Salvar</button>
       </div>
     </div>
@@ -734,41 +1221,30 @@
   <!-- User Modal -->
   <div x-show="userModal" class="modal-overlay" @click.self="userModal=false">
     <div class="modal">
-      <h3 class="mb-4" style="color:#e2e8f0;font-weight:700" x-text="userModalEdit ? 'Editar Usuário' : 'Novo Usuário'"></h3>
+      <div class="modal-header">
+        <div class="modal-title"><i class="fas fa-user"></i> <span x-text="userModalEdit ? 'Editar Usuário' : 'Novo Usuário'"></span></div>
+        <button @click="userModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+      </div>
       <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block mb-1" style="color:#64748b">Usuário *</label>
-          <input x-model="userForm.username" type="text" class="input-field" :disabled="userModalEdit" />
-        </div>
-        <div x-show="!userModalEdit">
-          <label class="block mb-1" style="color:#64748b">Senha *</label>
-          <input x-model="userForm.password" type="password" class="input-field" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">Nome Completo</label>
-          <input x-model="userForm.full_name" type="text" class="input-field" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">E-mail</label>
-          <input x-model="userForm.email" type="email" class="input-field" />
-        </div>
-        <div>
-          <label class="block mb-1" style="color:#64748b">Perfil</label>
+        <div><label class="form-label">Usuário *</label><input x-model="userForm.username" type="text" class="input-field" :disabled="userModalEdit" /></div>
+        <div x-show="!userModalEdit"><label class="form-label">Senha *</label><input x-model="userForm.password" type="password" class="input-field" /></div>
+        <div><label class="form-label">Nome Completo</label><input x-model="userForm.full_name" type="text" class="input-field" /></div>
+        <div><label class="form-label">E-mail</label><input x-model="userForm.email" type="email" class="input-field" /></div>
+        <div><label class="form-label">Perfil</label>
           <select x-model="userForm.role" class="input-field">
             <option value="viewer">Visualizador</option>
             <option value="admin">Administrador</option>
           </select>
         </div>
-        <div x-show="userModalEdit">
-          <label class="block mb-1" style="color:#64748b">Status</label>
+        <div x-show="userModalEdit"><label class="form-label">Status</label>
           <select x-model="userForm.is_active" class="input-field">
             <option :value="true">Ativo</option>
             <option :value="false">Inativo</option>
           </select>
         </div>
       </div>
-      <div class="flex gap-2 mt-4 justify-end">
-        <button @click="userModal=false" class="btn btn-secondary">Cancelar</button>
+      <div style="display:flex;gap:8px;margin-top:22px;justify-content:flex-end">
+        <button @click="userModal=false" class="btn btn-ghost">Cancelar</button>
         <button @click="saveUser()" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Salvar</button>
       </div>
     </div>
@@ -776,213 +1252,179 @@
 
   <!-- ONU Detail Modal -->
   <div x-show="onuDetailModal" class="modal-overlay" @click.self="onuDetailModal=false">
-    <div class="modal" style="max-width:700px">
-      <div class="flex items-center justify-between mb-4">
-        <h3 style="color:#e2e8f0;font-weight:700"><i class="fas fa-router mr-2" style="color:#3b82f6"></i>Detalhes da ONU <span x-text="onuDetailData ? onuDetailData.onu_index : ''" style="color:#60a5fa;font-family:monospace"></span></h3>
-        <div class="flex gap-2">
-          <button @click="refreshONUDetail()" class="btn btn-warning btn-sm" title="Forçar atualização"><i class="fas fa-rotate-right"></i></button>
-          <button @click="onuDetailModal=false" class="btn btn-secondary btn-sm"><i class="fas fa-times"></i></button>
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fas fa-router"></i>
+          Detalhes da ONU
+          <span x-show="onuDetailData" x-text="onuDetailData ? onuDetailData.onu_interface || onuDetailData.onu_index || '' : ''"
+                style="color:#79c0ff;font-family:monospace;font-size:12.5px;background:var(--accent-glow);padding:2px 8px;border-radius:5px;border:1px solid var(--accent-border)"></span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button @click="refreshONUDetail()" class="btn btn-warning btn-xs" title="Forçar atualização"><i class="fas fa-rotate-right"></i></button>
+          <button @click="onuDetailModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
         </div>
       </div>
 
-      <div x-show="onuDetailLoading" class="text-center py-8"><div class="loading" style="width:24px;height:24px;border-width:3px"></div><div class="mt-2" style="color:#64748b">Consultando OLT...</div></div>
+      <div x-show="onuDetailLoading" class="empty-state">
+        <div class="spinner spinner-lg" style="margin:0 auto 16px"></div>
+        <p>Consultando OLT via Telnet...</p>
+      </div>
 
       <div x-show="onuDetailData && !onuDetailLoading">
         <!-- Cache info -->
-        <div x-show="onuDetailData && onuDetailData.cached" class="mb-3 flex items-center gap-2" style="color:#fbbf24;background:rgba(245,158,11,0.1);padding:6px 10px;border-radius:6px;border:1px solid rgba(245,158,11,0.2)">
+        <div x-show="onuDetailData && onuDetailData.cached" class="cache-bar">
           <i class="fas fa-database"></i>
           <span>Cache Redis — expira em: <strong x-text="onuDetailData ? onuDetailData.cache_expires_in : ''"></strong></span>
+          <span style="margin-left:auto;color:var(--text-muted);font-size:11px" x-text="onuDetailData ? onuDetailData.last_updated : ''"></span>
         </div>
 
         <!-- Tabs -->
-        <div class="flex gap-1 mb-4 flex-wrap">
-          <button @click="detailTab='info'" :class="detailTab==='info'?'tab-btn active':'tab-btn'">Info Geral</button>
-          <button @click="detailTab='status'" :class="detailTab==='status'?'tab-btn active':'tab-btn'">Estado</button>
-          <button @click="detailTab='power'" :class="detailTab==='power'?'tab-btn active':'tab-btn'">Potência</button>
-          <button @click="detailTab='history'" :class="detailTab==='history'?'tab-btn active':'tab-btn'">Histórico</button>
-          <button @click="detailTab='wan'" :class="detailTab==='wan'?'tab-btn active':'tab-btn'">WAN</button>
-          <button @click="detailTab='voip'" :class="detailTab==='voip'?'tab-btn active':'tab-btn'">VoIP</button>
-          <button @click="detailTab='firmware'" :class="detailTab==='firmware'?'tab-btn active':'tab-btn'">Firmware</button>
+        <div class="tab-bar">
+          <button @click="detailTab='info'"     :class="detailTab==='info'?'tab-btn active':'tab-btn'"><i class="fas fa-info-circle mr-1"></i>Info Geral</button>
+          <button @click="detailTab='status'"   :class="detailTab==='status'?'tab-btn active':'tab-btn'"><i class="fas fa-signal mr-1"></i>Estado</button>
+          <button @click="detailTab='power'"    :class="detailTab==='power'?'tab-btn active':'tab-btn'"><i class="fas fa-bolt mr-1"></i>Potência</button>
+          <button @click="detailTab='history'"  :class="detailTab==='history'?'tab-btn active':'tab-btn'"><i class="fas fa-clock-rotate-left mr-1"></i>Histórico</button>
+          <button @click="detailTab='wan'"      :class="detailTab==='wan'?'tab-btn active':'tab-btn'"><i class="fas fa-globe mr-1"></i>WAN</button>
+          <button @click="detailTab='voip'"     :class="detailTab==='voip'?'tab-btn active':'tab-btn'"><i class="fas fa-phone mr-1"></i>VoIP</button>
+          <button @click="detailTab='firmware'" :class="detailTab==='firmware'?'tab-btn active':'tab-btn'"><i class="fas fa-microchip mr-1"></i>Firmware</button>
         </div>
 
-        <!-- Info Geral Tab (show gpon onu detail-info) -->
+        <!-- Info Geral -->
         <div x-show="detailTab==='info'">
           <template x-if="onuDetailData && onuDetailData.detail">
             <div class="detail-grid">
-              <div class="detail-item"><div class="detail-label">Interface ONU</div><div class="detail-value" style="font-family:monospace;color:#60a5fa" x-text="onuDetailData.onu_interface || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Nome</div><div class="detail-value" x-text="onuDetailData.detail.name || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Tipo</div><div class="detail-value" x-text="onuDetailData.detail.onu_type || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Serial Number</div><div class="detail-value" style="font-family:monospace;color:#fbbf24" x-text="onuDetailData.detail.serial_number || '-'"></div></div>
-              <div class="detail-item" style="grid-column:span 2"><div class="detail-label">Descrição</div><div class="detail-value" style="color:#94a3b8" x-text="onuDetailData.detail.description || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Admin State</div><div class="detail-value"><span :class="onuDetailData.detail.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="onuDetailData.detail.admin_state || '-'"></span></div></div>
-              <div class="detail-item"><div class="detail-label">Phase State</div><div class="detail-value"><span :class="onuDetailData.detail.phase_state==='working'?'badge badge-green':'badge badge-yellow'" x-text="onuDetailData.detail.phase_state || '-'"></span></div></div>
-              <div class="detail-item"><div class="detail-label">Config State</div><div class="detail-value"><span :class="onuDetailData.detail.config_state==='success'?'badge badge-green':'badge badge-red'" x-text="onuDetailData.detail.config_state || '-'"></span></div></div>
-              <div class="detail-item"><div class="detail-label">ONU Status</div><div class="detail-value" x-text="onuDetailData.detail.onu_status || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Distância</div><div class="detail-value" style="font-family:monospace;color:#4ade80" x-text="onuDetailData.detail.distance ? onuDetailData.detail.distance + ' m' : '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Tempo Online</div><div class="detail-value" x-text="onuDetailData.detail.online_duration || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Modo Auth</div><div class="detail-value" x-text="onuDetailData.detail.auth_mode || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Canal</div><div class="detail-value" x-text="onuDetailData.detail.current_channel || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Line Profile</div><div class="detail-value" x-text="onuDetailData.detail.line_profile || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Service Profile</div><div class="detail-value" x-text="onuDetailData.detail.service_profile || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">DBA Mode</div><div class="detail-value" x-text="onuDetailData.detail.dba_mode || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">FEC</div><div class="detail-value" x-text="onuDetailData.detail.fec || '-'"></div></div>
+              <div class="detail-item"><div class="detail-label">Interface ONU</div><div class="detail-value mono" x-text="onuDetailData.onu_interface || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Nome</div><div class="detail-value" x-text="onuDetailData.detail.name || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Tipo</div><div class="detail-value" x-text="onuDetailData.detail.onu_type || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Serial Number</div><div class="detail-value mono" style="color:#e3b341" x-text="onuDetailData.detail.serial_number || '—'"></div></div>
+              <div class="detail-item" style="grid-column:span 2"><div class="detail-label">Descrição</div><div class="detail-value" style="color:var(--text-secondary)" x-text="onuDetailData.detail.description || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Admin State</div><div class="detail-value"><span :class="onuDetailData.detail.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="onuDetailData.detail.admin_state || '—'"></span></div></div>
+              <div class="detail-item"><div class="detail-label">Phase State</div><div class="detail-value"><span :class="onuDetailData.detail.phase_state==='working'?'badge badge-green':'badge badge-yellow'" x-text="onuDetailData.detail.phase_state || '—'"></span></div></div>
+              <div class="detail-item"><div class="detail-label">Config State</div><div class="detail-value"><span :class="onuDetailData.detail.config_state==='success'?'badge badge-green':'badge badge-red'" x-text="onuDetailData.detail.config_state || '—'"></span></div></div>
+              <div class="detail-item"><div class="detail-label">ONU Status</div><div class="detail-value" x-text="onuDetailData.detail.onu_status || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Distância</div><div class="detail-value mono" style="color:#56d364" x-text="onuDetailData.detail.distance ? onuDetailData.detail.distance + ' m' : '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Tempo Online</div><div class="detail-value" x-text="onuDetailData.detail.online_duration || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Modo Auth</div><div class="detail-value" x-text="onuDetailData.detail.auth_mode || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Line Profile</div><div class="detail-value" x-text="onuDetailData.detail.line_profile || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Service Profile</div><div class="detail-value" x-text="onuDetailData.detail.service_profile || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">DBA Mode</div><div class="detail-value" x-text="onuDetailData.detail.dba_mode || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">FEC</div><div class="detail-value" x-text="onuDetailData.detail.fec || '—'"></div></div>
             </div>
           </template>
-          <div x-show="!onuDetailData || !onuDetailData.detail" style="color:#64748b">Dados não disponíveis.</div>
+          <div x-show="!onuDetailData || !onuDetailData.detail" class="empty-state" style="padding:24px"><i class="fas fa-info-circle" style="font-size:24px"></i><p>Dados não disponíveis.</p></div>
         </div>
 
-        <!-- Status Tab -->
+        <!-- Estado -->
         <div x-show="detailTab==='status'">
           <template x-if="onuDetailData && onuDetailData.status">
             <div class="detail-grid">
-              <div class="detail-item">
-                <div class="detail-label">Índice</div>
-                <div class="detail-value" style="font-family:monospace" x-text="onuDetailData.status.onu_index"></div>
-              </div>
-              <div class="detail-item">
-                <div class="detail-label">Admin State</div>
-                <div class="detail-value"><span :class="onuDetailData.status.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="onuDetailData.status.admin_state"></span></div>
-              </div>
-              <div class="detail-item">
-                <div class="detail-label">Oper State</div>
-                <div class="detail-value"><span :class="onuDetailData.status.oper_state==='working'?'badge badge-green':onuDetailData.status.oper_state==='disable'?'badge badge-red':'badge badge-yellow'" x-text="onuDetailData.status.oper_state"></span></div>
-              </div>
-              <div class="detail-item">
-                <div class="detail-label">Última Queda</div>
-                <div class="detail-value" x-text="onuDetailData.status.last_down_cause || '-'"></div>
-              </div>
+              <div class="detail-item"><div class="detail-label">Índice</div><div class="detail-value mono" x-text="onuDetailData.status.onu_index"></div></div>
+              <div class="detail-item"><div class="detail-label">Admin State</div><div class="detail-value"><span :class="onuDetailData.status.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="onuDetailData.status.admin_state"></span></div></div>
+              <div class="detail-item"><div class="detail-label">Oper State</div><div class="detail-value"><span :class="onuDetailData.status.oper_state==='working'?'badge badge-green':onuDetailData.status.oper_state==='disable'?'badge badge-red':'badge badge-yellow'" x-text="onuDetailData.status.oper_state"></span></div></div>
+              <div class="detail-item"><div class="detail-label">Última Queda</div><div class="detail-value" x-text="onuDetailData.status.last_down_cause || '—'"></div></div>
             </div>
           </template>
-          <div x-show="!onuDetailData || !onuDetailData.status" style="color:#64748b">Dados não disponíveis.</div>
+          <div x-show="!onuDetailData || !onuDetailData.status" class="empty-state" style="padding:24px"><i class="fas fa-signal" style="font-size:24px"></i><p>Dados não disponíveis.</p></div>
         </div>
 
-        <!-- Histórico Tab -->
+        <!-- Histórico -->
         <div x-show="detailTab==='history'">
           <template x-if="onuDetailData && onuDetailData.detail && onuDetailData.detail.history && onuDetailData.detail.history.length > 0">
-            <div class="table-container">
+            <div class="table-wrap">
               <table>
                 <thead><tr><th>#</th><th>Data/Hora Auth</th><th>Data/Hora Offline</th><th>Causa</th></tr></thead>
                 <tbody>
                   <template x-for="(h, i) in onuDetailData.detail.history" :key="i">
                     <tr>
-                      <td style="color:#64748b" x-text="i+1"></td>
-                      <td style="font-family:monospace;color:#4ade80" x-text="h.auth_time || '-'"></td>
-                      <td style="font-family:monospace;color:#f87171" x-text="h.offline_time || '-'"></td>
-                      <td><span :class="h.cause==='LOSi'||h.cause==='LOS'||h.cause==='LOF'?'badge badge-red':h.cause==='DyingGasp'||h.cause==='PowerOff'?'badge badge-yellow':'badge badge-gray'" x-text="h.cause || '-'"></span></td>
+                      <td style="color:var(--text-muted)" x-text="i+1"></td>
+                      <td class="td-mono" style="color:#56d364" x-text="h.auth_time || '—'"></td>
+                      <td class="td-mono" style="color:#ff7b72" x-text="h.offline_time || '—'"></td>
+                      <td><span :class="h.cause==='LOSi'||h.cause==='LOS'||h.cause==='LOF'?'badge badge-red':h.cause==='DyingGasp'||h.cause==='PowerOff'?'badge badge-yellow':'badge badge-gray'" x-text="h.cause || '—'"></span></td>
                     </tr>
                   </template>
                 </tbody>
               </table>
             </div>
           </template>
-          <div x-show="!onuDetailData || !onuDetailData.detail || !onuDetailData.detail.history || onuDetailData.detail.history.length === 0" style="color:#64748b">Nenhum histórico de queda encontrado.</div>
+          <div x-show="!onuDetailData || !onuDetailData.detail || !onuDetailData.detail.history || onuDetailData.detail.history.length === 0" class="empty-state" style="padding:24px"><i class="fas fa-clock-rotate-left" style="font-size:24px"></i><p>Nenhum histórico de queda encontrado.</p></div>
         </div>
 
-        <!-- Power Tab -->
+        <!-- Potência -->
         <div x-show="detailTab==='power'">
           <template x-if="onuDetailData && onuDetailData.power">
             <div>
               <div class="detail-grid mb-3">
                 <div class="detail-item">
                   <div class="detail-label">RX Power (ONU recebe)</div>
-                  <div class="detail-value flex items-center gap-2">
-                    <span style="font-family:monospace" x-text="onuDetailData.power.rx_power !== undefined ? onuDetailData.power.rx_power + ' dBm' : '-'"></span>
-                    <span class="power-indicator" :class="'power-' + (onuDetailData.power.rx_status || 'unknown')"></span>
-                    <span :class="onuDetailData.power.rx_status==='normal'?'badge badge-green':onuDetailData.power.rx_status==='warning'?'badge badge-yellow':'badge badge-red'" x-text="onuDetailData.power.rx_status || '-'"></span>
+                  <div class="detail-value" style="display:flex;align-items:center;gap:8px">
+                    <span class="td-mono" x-text="onuDetailData.power.rx_power !== undefined ? onuDetailData.power.rx_power + ' dBm' : (onuDetailData.power.onu_rx_power !== undefined ? onuDetailData.power.onu_rx_power + ' dBm' : '—')"></span>
+                    <span class="power-dot" :class="'power-' + (onuDetailData.power.rx_status || onuDetailData.power.onu_rx_status || 'unknown')"></span>
+                    <span :class="(onuDetailData.power.rx_status||onuDetailData.power.onu_rx_status)==='normal'?'badge badge-green':(onuDetailData.power.rx_status||onuDetailData.power.onu_rx_status)==='warning'?'badge badge-yellow':'badge badge-red'"
+                          x-text="onuDetailData.power.rx_status || onuDetailData.power.onu_rx_status || '—'"></span>
                   </div>
                 </div>
                 <div class="detail-item">
                   <div class="detail-label">TX Power (ONU transmite)</div>
-                  <div class="detail-value" style="font-family:monospace" x-text="onuDetailData.power.tx_power !== undefined ? onuDetailData.power.tx_power + ' dBm' : '-'"></div>
+                  <div class="detail-value td-mono" x-text="(onuDetailData.power.tx_power !== undefined ? onuDetailData.power.tx_power : onuDetailData.power.onu_tx_power) !== undefined ? (onuDetailData.power.tx_power ?? onuDetailData.power.onu_tx_power) + ' dBm' : '—'"></div>
                 </div>
                 <div class="detail-item">
-                  <div class="detail-label">Atenuação</div>
-                  <div class="detail-value" style="font-family:monospace" x-text="onuDetailData.power.attenuation !== undefined ? onuDetailData.power.attenuation + ' dBm' : '-'"></div>
+                  <div class="detail-label">OLT RX (recebe da ONU)</div>
+                  <div class="detail-value td-mono" x-text="onuDetailData.power.olt_rx_power !== undefined ? onuDetailData.power.olt_rx_power + ' dBm' : '—'"></div>
+                </div>
+                <div class="detail-item">
+                  <div class="detail-label">Atenuação Downstream</div>
+                  <div class="detail-value td-mono" x-text="(onuDetailData.power.attenuation ?? onuDetailData.power.down_attenuation) !== undefined ? (onuDetailData.power.attenuation ?? onuDetailData.power.down_attenuation) + ' dB' : '—'"></div>
                 </div>
               </div>
-              <div class="p-3 rounded" style="background:#0f172a;border:1px solid #334155">
-                <div class="mb-2" style="color:#64748b;font-weight:600">Referência de Sinal RX ONU:</div>
-                <div class="flex gap-4">
-                  <span><span class="power-indicator power-normal"></span> -8 a -27 dBm = Normal</span>
-                  <span><span class="power-indicator power-warning"></span> -27 a -29 dBm = Atenção</span>
-                  <span><span class="power-indicator power-critical"></span> &lt; -29 dBm = Crítico</span>
+              <div style="background:var(--bg-base);border:1px solid var(--border-dim);border-radius:8px;padding:12px">
+                <div style="font-size:10.5px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Referência de Sinal RX ONU</div>
+                <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;color:var(--text-secondary)">
+                  <span><span class="power-dot power-normal" style="display:inline-block;margin-right:5px;vertical-align:middle"></span>-8 a -27 dBm = Normal</span>
+                  <span><span class="power-dot power-warning" style="display:inline-block;margin-right:5px;vertical-align:middle"></span>-27 a -29 dBm = Atenção</span>
+                  <span><span class="power-dot power-critical" style="display:inline-block;margin-right:5px;vertical-align:middle"></span>&lt; -29 dBm = Crítico</span>
                 </div>
               </div>
             </div>
           </template>
+          <div x-show="!onuDetailData || !onuDetailData.power" class="empty-state" style="padding:24px"><i class="fas fa-bolt" style="font-size:24px"></i><p>Dados de potência não disponíveis.</p></div>
         </div>
 
-        <!-- Distance Tab -->
-        <div x-show="detailTab==='distance'">
-          <template x-if="onuDetailData && onuDetailData.distance">
-            <div class="detail-item" style="max-width:300px">
-              <div class="detail-label">Distância da ONU</div>
-              <div class="detail-value" style="font-size:18px!important;font-weight:700;color:#60a5fa" x-text="onuDetailData.distance.distance_m ? onuDetailData.distance.distance_m + ' m' : 'Não disponível'"></div>
-            </div>
-          </template>
-        </div>
-
-        <!-- WAN Tab -->
+        <!-- WAN -->
         <div x-show="detailTab==='wan'">
           <template x-if="onuDetailData && onuDetailData.wan">
             <div class="detail-grid">
-              <div class="detail-item"><div class="detail-label">Tipo de Conexão</div><div class="detail-value" x-text="onuDetailData.wan.connection_type || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Status</div>
-                <div class="detail-value">
-                  <span :class="onuDetailData.wan.status==='Connected'||onuDetailData.wan.status==='connected'?'badge badge-green':onuDetailData.wan.status==='Connecting'||onuDetailData.wan.status==='connecting'?'badge badge-yellow':'badge badge-red'" x-text="onuDetailData.wan.status || '-'"></span>
-                </div>
-              </div>
-              <div class="detail-item"><div class="detail-label">IP WAN</div><div class="detail-value" style="font-family:monospace" x-text="onuDetailData.wan.ip_address || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Gateway</div><div class="detail-value" style="font-family:monospace" x-text="onuDetailData.wan.gateway || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">DNS</div><div class="detail-value" style="font-family:monospace" x-text="onuDetailData.wan.dns || '-'"></div></div>
+              <div class="detail-item"><div class="detail-label">Tipo de Conexão</div><div class="detail-value" x-text="onuDetailData.wan.connection_type || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span :class="onuDetailData.wan.status==='Connected'||onuDetailData.wan.status==='connected'?'badge badge-green':onuDetailData.wan.status==='Connecting'?'badge badge-yellow':'badge badge-red'" x-text="onuDetailData.wan.status || '—'"></span></div></div>
+              <div class="detail-item"><div class="detail-label">IP WAN</div><div class="detail-value mono" x-text="onuDetailData.wan.ip_address || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Gateway</div><div class="detail-value mono" x-text="onuDetailData.wan.gateway || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">DNS</div><div class="detail-value mono" x-text="onuDetailData.wan.dns || '—'"></div></div>
             </div>
           </template>
+          <div x-show="!onuDetailData || !onuDetailData.wan" class="empty-state" style="padding:24px"><i class="fas fa-globe" style="font-size:24px"></i><p>Dados WAN não disponíveis.</p></div>
         </div>
 
-        <!-- VoIP Tab -->
+        <!-- VoIP -->
         <div x-show="detailTab==='voip'">
           <template x-if="onuDetailData && onuDetailData.voip">
             <div class="detail-item" style="max-width:300px">
               <div class="detail-label">Status VoIP</div>
-              <div class="detail-value">
-                <span :class="onuDetailData.voip.status==='Registered'||onuDetailData.voip.status==='registered'?'badge badge-green':onuDetailData.voip.status==='Failed'||onuDetailData.voip.status==='failed'?'badge badge-red':'badge badge-yellow'" x-text="onuDetailData.voip.status || 'Não disponível'"></span>
-              </div>
+              <div class="detail-value"><span :class="onuDetailData.voip.status==='Registered'||onuDetailData.voip.status==='registered'?'badge badge-green':onuDetailData.voip.status==='Failed'||onuDetailData.voip.status==='failed'?'badge badge-red':'badge badge-yellow'" x-text="onuDetailData.voip.status || 'Não disponível'"></span></div>
             </div>
           </template>
+          <div x-show="!onuDetailData || !onuDetailData.voip" class="empty-state" style="padding:24px"><i class="fas fa-phone" style="font-size:24px"></i><p>Dados VoIP não disponíveis.</p></div>
         </div>
 
-        <!-- Temperature Tab -->
-        <div x-show="detailTab==='temp'">
-          <template x-if="onuDetailData && onuDetailData.temperature">
-            <div>
-              <div class="detail-item mb-3" style="max-width:300px">
-                <div class="detail-label">Temperatura</div>
-                <div class="detail-value flex items-center gap-2">
-                  <span style="font-size:18px!important;font-weight:700" x-text="onuDetailData.temperature.temperature ? onuDetailData.temperature.temperature + ' °C' : 'N/D'"></span>
-                  <span :class="onuDetailData.temperature.temp_status==='normal'?'badge badge-green':onuDetailData.temperature.temp_status==='warning'?'badge badge-yellow':'badge badge-red'" x-text="onuDetailData.temperature.temp_status"></span>
-                </div>
-              </div>
-              <div class="p-3 rounded" style="background:#0f172a;border:1px solid #334155">
-                <div class="mb-2" style="color:#64748b;font-weight:600">Faixas de Temperatura:</div>
-                <div class="flex gap-4">
-                  <span><span class="power-indicator power-normal"></span> 35°C - 70°C = Normal</span>
-                  <span><span class="power-indicator power-warning"></span> 70°C - 80°C = Atenção</span>
-                  <span><span class="power-indicator power-critical"></span> &gt; 80°C = Crítico</span>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
-
-        <!-- Firmware Tab -->
+        <!-- Firmware -->
         <div x-show="detailTab==='firmware'">
           <template x-if="onuDetailData && onuDetailData.firmware">
             <div class="detail-grid">
-              <div class="detail-item"><div class="detail-label">Versão Atual</div><div class="detail-value" style="font-family:monospace" x-text="onuDetailData.firmware.current_version || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Versão Ativa</div><div class="detail-value" style="font-family:monospace" x-text="onuDetailData.firmware.active_version || '-'"></div></div>
-              <div class="detail-item"><div class="detail-label">Versão Backup</div><div class="detail-value" style="font-family:monospace" x-text="onuDetailData.firmware.backup_version || '-'"></div></div>
+              <div class="detail-item"><div class="detail-label">Versão Atual</div><div class="detail-value mono" x-text="onuDetailData.firmware.current_version || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Versão Ativa</div><div class="detail-value mono" x-text="onuDetailData.firmware.active_version || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Versão Backup</div><div class="detail-value mono" x-text="onuDetailData.firmware.backup_version || '—'"></div></div>
             </div>
           </template>
+          <div x-show="!onuDetailData || !onuDetailData.firmware" class="empty-state" style="padding:24px"><i class="fas fa-microchip" style="font-size:24px"></i><p>Dados de firmware não disponíveis.</p></div>
         </div>
 
       </div><!-- /detail data -->
@@ -991,19 +1433,25 @@
 
   <!-- 2FA Setup Modal -->
   <div x-show="twoFASetupModal" class="modal-overlay" @click.self="twoFASetupModal=false">
-    <div class="modal text-center">
-      <h3 class="mb-3" style="color:#e2e8f0;font-weight:700"><i class="fas fa-shield-halved mr-2" style="color:#3b82f6"></i>Configurar 2FA</h3>
-      <p class="mb-4" style="color:#94a3b8">Escaneie o QR Code com Google Authenticator, Authy ou outro aplicativo TOTP.</p>
-      <div class="qr-container mx-auto mb-4" x-show="twoFAData">
+    <div class="modal" style="text-align:center;max-width:420px">
+      <div style="margin-bottom:18px">
+        <div style="width:56px;height:56px;background:var(--accent-glow);border:1px solid var(--accent-border);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <i class="fas fa-shield-halved" style="color:var(--accent);font-size:24px"></i>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:var(--text-primary)">Configurar 2FA</div>
+        <p style="color:var(--text-secondary);font-size:12px;margin-top:6px">Escaneie o QR Code com Google Authenticator, Authy ou outro aplicativo TOTP.</p>
+      </div>
+      <div class="qr-container" style="margin:0 auto 16px;display:inline-block" x-show="twoFAData">
         <img :src="twoFAData ? twoFAData.qr_code_url : ''" alt="QR Code 2FA" style="width:180px;height:180px" />
       </div>
-      <div class="mb-3" style="color:#64748b">Ou insira manualmente: <strong style="color:#60a5fa;font-family:monospace" x-text="twoFAData ? twoFAData.secret : ''"></strong></div>
+      <div style="color:var(--text-muted);font-size:12px;margin-bottom:16px">Ou insira manualmente: <strong style="color:#79c0ff;font-family:monospace" x-text="twoFAData ? twoFAData.secret : ''"></strong></div>
       <div class="mb-4">
-        <label class="block mb-1" style="color:#94a3b8">Confirme com o código do aplicativo:</label>
-        <input x-model="twoFAConfirmCode" type="text" class="input-field text-center" placeholder="000000" maxlength="6" style="letter-spacing:0.3em;font-size:16px!important;max-width:200px;margin:0 auto" />
+        <label class="form-label" style="text-align:left">Confirme com o código do aplicativo:</label>
+        <input x-model="twoFAConfirmCode" type="text" class="input-field" placeholder="000000" maxlength="6"
+               style="letter-spacing:0.5em;font-size:20px;text-align:center;max-width:200px;margin:0 auto;display:block" />
       </div>
-      <div class="flex gap-2 justify-center">
-        <button @click="twoFASetupModal=false" class="btn btn-secondary">Cancelar</button>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button @click="twoFASetupModal=false" class="btn btn-ghost">Cancelar</button>
         <button @click="confirmEnable2FA()" class="btn btn-success"><i class="fas fa-check mr-1"></i>Ativar 2FA</button>
       </div>
     </div>
@@ -1011,12 +1459,18 @@
 
   <!-- Disable 2FA Modal -->
   <div x-show="disable2FAModal" class="modal-overlay" @click.self="disable2FAModal=false">
-    <div class="modal text-center">
-      <h3 class="mb-3" style="color:#e2e8f0;font-weight:700"><i class="fas fa-shield-xmark mr-2" style="color:#ef4444"></i>Desativar 2FA</h3>
-      <p class="mb-4" style="color:#94a3b8">Confirme com o código atual do seu aplicativo autenticador.</p>
-      <input x-model="disable2FACode" type="text" class="input-field text-center" placeholder="000000" maxlength="6" style="letter-spacing:0.3em;font-size:16px!important;max-width:200px;margin:0 auto 16px" />
-      <div class="flex gap-2 justify-center">
-        <button @click="disable2FAModal=false" class="btn btn-secondary">Cancelar</button>
+    <div class="modal" style="text-align:center;max-width:380px">
+      <div style="margin-bottom:18px">
+        <div style="width:56px;height:56px;background:var(--red-glow);border:1px solid rgba(248,81,73,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <i class="fas fa-shield-xmark" style="color:#ff7b72;font-size:24px"></i>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:var(--text-primary)">Desativar 2FA</div>
+        <p style="color:var(--text-muted);font-size:12px;margin-top:6px">Confirme com o código atual do seu aplicativo autenticador.</p>
+      </div>
+      <input x-model="disable2FACode" type="text" class="input-field" placeholder="000000" maxlength="6"
+             style="letter-spacing:0.5em;font-size:20px;text-align:center;max-width:200px;margin:0 auto 18px;display:block" />
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button @click="disable2FAModal=false" class="btn btn-ghost">Cancelar</button>
         <button @click="confirmDisable2FA()" class="btn btn-danger"><i class="fas fa-shield-xmark mr-1"></i>Desativar</button>
       </div>
     </div>
@@ -1024,12 +1478,15 @@
 
   <!-- Reset Password Modal -->
   <div x-show="resetPassModal" class="modal-overlay" @click.self="resetPassModal=false">
-    <div class="modal">
-      <h3 class="mb-3" style="color:#e2e8f0;font-weight:700"><i class="fas fa-key mr-2" style="color:#f59e0b"></i>Redefinir Senha</h3>
-      <p class="mb-3" style="color:#94a3b8">Usuário: <strong x-text="resetPassUser ? resetPassUser.username : ''"></strong></p>
+    <div class="modal" style="max-width:380px">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fas fa-key" style="color:var(--yellow)"></i> Redefinir Senha</div>
+        <button @click="resetPassModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+      </div>
+      <p style="color:var(--text-secondary);font-size:12px;margin-bottom:14px">Usuário: <strong x-text="resetPassUser ? resetPassUser.username : ''"></strong></p>
       <input x-model="resetPassNew" type="password" class="input-field mb-4" placeholder="Nova senha (mín. 6 caracteres)" />
-      <div class="flex gap-2 justify-end">
-        <button @click="resetPassModal=false" class="btn btn-secondary">Cancelar</button>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button @click="resetPassModal=false" class="btn btn-ghost">Cancelar</button>
         <button @click="confirmResetPassword()" class="btn btn-warning"><i class="fas fa-key mr-1"></i>Redefinir</button>
       </div>
     </div>

@@ -60,7 +60,7 @@ def login(request: LoginRequest, req: Request, db: Session = Depends(get_db)):
     token_data = {"sub": user.username, "role": user.role, "2fa_verified": True}
     token = create_access_token(token_data)
 
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now()
     db.commit()
 
     log_action(db, user.id, user.username, "LOGIN_SUCCESS", ip_address=req.client.host)
@@ -89,7 +89,7 @@ def verify_2fa(
     token_data = {"sub": current_user.username, "role": current_user.role, "2fa_verified": True}
     token = create_access_token(token_data)
 
-    current_user.last_login = datetime.utcnow()
+    current_user.last_login = datetime.now()
     db.commit()
 
     log_action(db, current_user.id, current_user.username, "2FA_VERIFIED", ip_address=req.client.host)

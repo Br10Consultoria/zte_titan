@@ -2,6 +2,11 @@ const API_BASE = '/api';
 
 function app() {
   return {
+    // Branding
+    logoExists: false,
+    logoSrc: '/static/img/logo.png',
+    appTitle: 'ZTE TITAN',
+
     // Auth
     isLoggedIn: false,
     loginStep: 1,
@@ -15,6 +20,7 @@ function app() {
 
     // Navigation
     page: 'dashboard',
+    sidebarCollapsed: false,
 
     // Toast
     toast: { show: false, message: '', type: 'info' },
@@ -81,6 +87,14 @@ function app() {
     // INIT
     // ============================================================
     async init() {
+      // Verifica se logo existe
+      try {
+        const logoRes = await fetch('/static/img/logo.png', { method: 'HEAD' });
+        this.logoExists = logoRes.ok;
+      } catch (e) {
+        this.logoExists = false;
+      }
+
       const token = localStorage.getItem('zte_token');
       const user = localStorage.getItem('zte_user');
       if (token && user) {
@@ -413,6 +427,10 @@ function app() {
         const q = this.onuSearch.toLowerCase();
         list = list.filter(o =>
           o.onu_index.toLowerCase().includes(q) ||
+          (o.serial && o.serial.toLowerCase().includes(q)) ||
+          (o.model && o.model.toLowerCase().includes(q)) ||
+          (o.onu_type && o.onu_type.toLowerCase().includes(q)) ||
+          (o.description && o.description.toLowerCase().includes(q)) ||
           (o.last_down_cause && o.last_down_cause.toLowerCase().includes(q))
         );
       }

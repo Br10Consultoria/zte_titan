@@ -37,9 +37,12 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=480
       - SSH_TIMEOUT=30
       - SSH_COMMAND_TIMEOUT=60
+      - TZ=America/Sao_Paulo
     volumes:
       - app_data:/app/data
       - ./frontend:/app/frontend:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     depends_on:
       - redis
     networks:
