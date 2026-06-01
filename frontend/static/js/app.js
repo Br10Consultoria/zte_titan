@@ -435,7 +435,15 @@ function app() {
         );
       }
       if (this.onuStateFilter) {
-        list = list.filter(o => o.oper_state === this.onuStateFilter);
+        const f = this.onuStateFilter.toLowerCase();
+        if (f === 'rx_ruim') {
+          // Filtro especial: sinal óptico ruim (RX OLT abaixo de -28 dBm)
+          list = list.filter(o => o.olt_rx_power !== null && o.olt_rx_power !== undefined && o.olt_rx_power < -28);
+        } else {
+          list = list.filter(o => (o.oper_state || '').toLowerCase() === f ||
+            (o.phase_state || '').toLowerCase() === f ||
+            (o.last_down_cause || '').toLowerCase() === f);
+        }
       }
       return list;
     },

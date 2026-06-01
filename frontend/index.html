@@ -68,6 +68,8 @@
       transition: width 0.22s cubic-bezier(.4,0,.2,1), min-width 0.22s cubic-bezier(.4,0,.2,1);
       position: relative;
       z-index: 20;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     .sidebar.collapsed {
       width: var(--sidebar-w-sm);
@@ -496,6 +498,38 @@
     .empty-state i { font-size: 40px; color: var(--border); display: block; margin-bottom: 14px; }
     .empty-state p { font-size: 13px; }
 
+    /* ── Legend panel ─────────────────────────────────────────── */
+    .sidebar-legend {
+      border-top: 1px solid var(--border-dim);
+      padding: 10px 12px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .legend-title {
+      font-size: 9.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+      white-space: nowrap; overflow: hidden;
+    }
+    .legend-row {
+      display: flex; align-items: center; gap: 7px;
+      padding: 3px 0;
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden;
+    }
+    .legend-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    }
+    .legend-dot-green  { background: #56d364; box-shadow: 0 0 4px rgba(86,211,100,0.5); }
+    .legend-dot-red    { background: #ff7b72; box-shadow: 0 0 4px rgba(255,123,114,0.5); }
+    .legend-dot-yellow { background: #e3b341; box-shadow: 0 0 4px rgba(227,179,65,0.5); }
+    .legend-dot-blue   { background: #79c0ff; box-shadow: 0 0 4px rgba(121,192,255,0.5); }
+    .legend-dot-gray   { background: #8b949e; }
+    .legend-label { font-weight: 600; color: var(--text-primary); min-width: 70px; }
+    .legend-desc  { color: var(--text-muted); font-size: 10px; }
+
     /* ── Responsive ────────────────────────────────────────────── */
     @media (max-width: 900px) {
       .sidebar { width: var(--sidebar-w-sm); min-width: var(--sidebar-w-sm); }
@@ -503,6 +537,7 @@
       .nav-item .nav-label,
       .nav-section,
       .user-info,
+      .sidebar-legend,
       .sidebar-user .btn span { display: none; }
       .nav-item { justify-content: center; padding: 10px; }
       .nav-item.active::before { display: none; }
@@ -663,6 +698,51 @@
         <button @click="logout()" class="btn btn-secondary btn-sm w-full" style="justify-content:center">
           <i class="fas fa-right-from-bracket"></i><span> Sair</span>
         </button>
+      </div>
+
+      <!-- Legenda de Estados -->
+      <div class="sidebar-legend" x-show="!sidebarCollapsed">
+        <div class="legend-title"><i class="fas fa-circle-info mr-1"></i> Estados ONU</div>
+        <div class="legend-row" title="Cliente online e funcionando">
+          <span class="legend-dot legend-dot-green"></span>
+          <span class="legend-label">working</span>
+          <span class="legend-desc">Online</span>
+        </div>
+        <div class="legend-row" title="Falta de energia elétrica na ONU">
+          <span class="legend-dot legend-dot-yellow"></span>
+          <span class="legend-label">DyingGasp</span>
+          <span class="legend-desc">Sem energia</span>
+        </div>
+        <div class="legend-row" title="Perda de sinal óptico (fibra cortada ou conector ruim)">
+          <span class="legend-dot legend-dot-red"></span>
+          <span class="legend-label">LOS/LOSi</span>
+          <span class="legend-desc">Fibra cortada</span>
+        </div>
+        <div class="legend-row" title="Perda de sincronismo GPON">
+          <span class="legend-dot legend-dot-red"></span>
+          <span class="legend-label">LOF</span>
+          <span class="legend-desc">Problema GPON</span>
+        </div>
+        <div class="legend-row" title="ONU reiniciou">
+          <span class="legend-dot legend-dot-blue"></span>
+          <span class="legend-label">Reboot</span>
+          <span class="legend-desc">Reiniciou</span>
+        </div>
+        <div class="legend-row" title="Falha de comunicação OMCI">
+          <span class="legend-dot legend-dot-yellow"></span>
+          <span class="legend-label">OMCI Down</span>
+          <span class="legend-desc">Falha OMCI</span>
+        </div>
+        <div class="legend-row" title="ONU desligada">
+          <span class="legend-dot legend-dot-gray"></span>
+          <span class="legend-label">PowerOff</span>
+          <span class="legend-desc">Desligada</span>
+        </div>
+        <div class="legend-row" title="Sinal óptico fraco (RX OLT abaixo de -28 dBm)">
+          <span class="legend-dot" style="background:linear-gradient(135deg,#ff7b72,#e3b341)"></span>
+          <span class="legend-label">RX &lt; -28</span>
+          <span class="legend-desc">Sinal ruim</span>
+        </div>
       </div>
     </aside>
 
@@ -930,12 +1010,36 @@
                 <input x-model="onuSearch" type="text" class="input-field" placeholder="Filtrar por índice, serial, modelo..."
                        style="padding-left:30px" />
               </div>
-              <select x-model="onuStateFilter" class="input-field" style="width:180px">
+              <select x-model="onuStateFilter" class="input-field" style="width:200px">
                 <option value="">Todos os estados</option>
-                <option value="working">Online (working)</option>
-                <option value="disable">Offline (disable)</option>
-                <option value="initial">Iniciando</option>
-                <option value="ranging">Ranging</option>
+                <optgroup label="Online">
+                  <option value="working">✅ working — Cliente online</option>
+                </optgroup>
+                <optgroup label="Problemas de energia">
+                  <option value="dyinggasp">⚡ DyingGasp — Falta de energia</option>
+                  <option value="poweroff">🔌 PowerOff — Desligado</option>
+                </optgroup>
+                <optgroup label="Problemas de fibra/sinal">
+                  <option value="losi">🔴 LOSi — Perda de sinal</option>
+                  <option value="los">🔴 LOS — Perda de sinal</option>
+                  <option value="lof">🟠 LOF — Problema GPON</option>
+                </optgroup>
+                <optgroup label="Reinicialização">
+                  <option value="reboot">🔄 Reboot — ONU reiniciou</option>
+                </optgroup>
+                <optgroup label="Comunicação">
+                  <option value="omci down">⚠️ OMCI Down — Falha OMCI</option>
+                  <option value="deactive">⛔ Deactive — Removida</option>
+                </optgroup>
+                <optgroup label="Registro">
+                  <option value="initial">🔵 initial — Registrando</option>
+                  <option value="ranging">🔵 ranging — Sincronizando</option>
+                  <option value="standby">🟡 standby — Aguardando</option>
+                  <option value="disable">⚫ disable — Desabilitada</option>
+                </optgroup>
+                <optgroup label="Sinal Óptico">
+                  <option value="rx_ruim">📡 RX abaixo de -28 dBm — Sinal ruim</option>
+                </optgroup>
               </select>
               <button @click="printONUTable()" class="btn btn-ghost btn-sm"><i class="fas fa-print mr-1"></i>Imprimir</button>
               <span x-show="onuStatusData" style="color:var(--text-muted);font-size:11.5px;margin-left:4px">
@@ -963,18 +1067,31 @@
                         <td x-text="onu.onu_type || onu.model || '—'"></td>
                         <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" :title="onu.description" x-text="onu.description || '—'"></td>
                         <td><span :class="onu.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="onu.admin_state"></span></td>
-                        <td><span :class="onu.oper_state==='working'?'badge badge-green':onu.oper_state==='disable'?'badge badge-red':'badge badge-yellow'" x-text="onu.oper_state"></span></td>
+                        <td>
+                          <span :class="onu.oper_state==='working'?'badge badge-green':onu.oper_state==='disable'?'badge badge-red':'badge badge-yellow'"
+                                :title="onu.oper_state==='working'?'Cliente online':onu.oper_state==='disable'?'ONU desabilitada':onu.oper_state==='initial'?'Registrando na OLT':onu.oper_state==='ranging'?'Sincronizando dist\u00e2ncia':onu.oper_state==='standby'?'Aguardando ativa\u00e7\u00e3o':onu.oper_state"
+                                x-text="onu.oper_state"></span>
+                        </td>
                         <td>
                           <span x-show="onu.last_down_cause"
-                                :class="onu.last_down_cause==='LOSi'||onu.last_down_cause==='LOS'||onu.last_down_cause==='LOF'?'badge badge-red':onu.last_down_cause==='DyingGasp'||onu.last_down_cause==='PowerOff'?'badge badge-yellow':'badge badge-gray'"
+                                :class="['LOSi','LOS','LOF'].includes(onu.last_down_cause)?'badge badge-red':['DyingGasp','PowerOff'].includes(onu.last_down_cause)?'badge badge-yellow':['Reboot','OLT Reset'].includes(onu.last_down_cause)?'badge badge-blue':'badge badge-gray'"
+                                :title="onu.last_down_cause==='DyingGasp'?'Falta de energia el\u00e9trica na ONU':onu.last_down_cause==='LOS'||onu.last_down_cause==='LOSi'?'Perda de sinal \u00f3ptico (fibra cortada ou conector ruim)':onu.last_down_cause==='LOF'?'Perda de sincronismo GPON':onu.last_down_cause==='PowerOff'?'ONU desligada':onu.last_down_cause==='Reboot'?'ONU reiniciou':onu.last_down_cause==='OMCI Down'?'Falha de comunica\u00e7\u00e3o OMCI':onu.last_down_cause==='Deactive'?'ONU removida ou desautorizada':onu.last_down_cause==='OLT Reset'?'Reinicializa\u00e7\u00e3o da OLT':onu.last_down_cause"
                                 x-text="onu.last_down_cause"></span>
                           <span x-show="!onu.last_down_cause" style="color:var(--text-muted)">—</span>
                         </td>
                         <td>
-                          <span x-show="onu.olt_rx_power !== null && onu.olt_rx_power !== undefined" class="td-mono"
-                                :style="onu.olt_rx_power < -27 ? 'color:#ff7b72' : onu.olt_rx_power < -25 ? 'color:#e3b341' : 'color:#56d364'"
-                                x-text="onu.olt_rx_power ? onu.olt_rx_power.toFixed(2) + ' dBm' : '—'"></span>
-                          <span x-show="onu.olt_rx_power === null || onu.olt_rx_power === undefined" style="color:var(--text-muted)">—</span>
+                          <template x-if="onu.olt_rx_power !== null && onu.olt_rx_power !== undefined">
+                            <span style="display:inline-flex;align-items:center;gap:5px"
+                                  :title="'RX OLT: ' + (onu.olt_rx_power ? onu.olt_rx_power.toFixed(3) : '') + ' dBm\n' + (onu.olt_rx_status==='normal'?'Sinal normal (> -25 dBm)':onu.olt_rx_status==='warning'?'Sinal fraco (-25 a -28 dBm)':'Sinal cr\u00edtico (< -28 dBm)')">
+                              <span class="power-dot" :class="onu.olt_rx_status==='normal'?'power-normal':onu.olt_rx_status==='warning'?'power-warning':'power-critical'"></span>
+                              <span class="td-mono"
+                                    :style="onu.olt_rx_status==='critical'?'color:#ff7b72':onu.olt_rx_status==='warning'?'color:#e3b341':'color:#56d364'"
+                                    x-text="onu.olt_rx_power.toFixed(2) + ' dBm'"></span>
+                            </span>
+                          </template>
+                          <template x-if="onu.olt_rx_power === null || onu.olt_rx_power === undefined">
+                            <span style="color:var(--text-muted)">—</span>
+                          </template>
                         </td>
                         <td>
                           <button @click="openONUDetail(onu)" class="btn btn-primary btn-xs">

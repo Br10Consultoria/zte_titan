@@ -21,7 +21,7 @@ from ..auth import get_current_user
 from ..olt_client import (
     get_olt_client, OLTConnectionError,
     parse_onu_state, parse_onu_detail, parse_onu_power,
-    parse_onu_baseinfo, parse_uncfg_onus,
+    parse_onu_baseinfo, parse_uncfg_onus, parse_olt_rx_power,
     _olt_iface, _onu_iface, get_onu_full_details
 )
 from ..redis_client import cache
@@ -94,14 +94,37 @@ def get_pon_status(
         base_list = parse_onu_baseinfo(base_out)
         base_map = {b["onu_index"]: b for b in base_list}
 
+        # RX OLT em batch (show pon power olt-rx)
+        rx_map = {}
+        try:
+            logger.info(f"[PON_STATUS] Executando: show pon power olt-rx {iface}")
+            rx_out = client.execute_command(f"show pon power olt-rx {iface}", timeout=30)
+            rx_map = parse_olt_rx_power(rx_out)
+            logger.info(f"[PON_STATUS] RX coletado para {len(rx_map)} ONUs")
+        except Exception as rx_err:
+            logger.warning(f"[PON_STATUS] Falha ao coletar RX OLT: {rx_err}")
+
         client.disconnect()
 
-        # Mescla baseinfo com estado
+        # Mescla baseinfo + RX com estado
         for onu in onus:
             idx = onu["onu_index"]
             base = base_map.get(idx, {})
             onu["serial"]     = base.get("serial", "")
             onu["model"]      = base.get("model", "")
+            # RX OLT
+            rx_val = rx_map.get(idx)
+            if rx_val is not None:
+                onu["olt_rx_power"] = rx_val
+                if rx_val >= -25:
+                    onu["olt_rx_status"] = "normal"
+                elif rx_val >= -28:
+                    onu["olt_rx_status"] = "warning"
+                else:
+                    onu["olt_rx_status"] = "critical"
+            else:
+                onu["olt_rx_power"] = None
+                onu["olt_rx_status"] = None
 
         # Atualiza contagem na porta
         if port_obj:

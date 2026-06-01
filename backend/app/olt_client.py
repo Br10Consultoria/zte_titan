@@ -651,6 +651,50 @@ def parse_onu_baseinfo(output: str) -> List[Dict]:
     return onus
 
 
+def parse_olt_rx_power(output: str) -> Dict[str, float]:
+    """
+    Parseia: show pon power olt-rx gpon-olt_SLOT/CARD/PON
+    Retorna dict {onu_index: rx_olt_dbm} para todas as ONUs da porta.
+
+    Formatos possíveis:
+      OnuIndex     OLT-Rx-Power(dBm)
+      1/1/1:1      -27.033
+      gpon-onu_1/1/1:1   -27.033
+    """
+    result = {}
+
+    def _safe_float(val: str):
+        try:
+            import math
+            f = float(val)
+            if math.isnan(f) or math.isinf(f):
+                return None
+            return round(f, 3)
+        except (ValueError, TypeError):
+            return None
+
+    for line in output.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        # Formato com prefixo: gpon-onu_1/1/1:1   -27.033
+        m = re.match(r'gpon-onu_(\d+/\d+(?:/\d+)?:\d+)\s+([-\d\.]+)', line)
+        if m:
+            v = _safe_float(m.group(2))
+            if v is not None:
+                result[m.group(1)] = v
+            continue
+        # Formato sem prefixo: 1/1/1:1   -27.033
+        m2 = re.match(r'^(\d+/\d+(?:/\d+)?:\d+)\s+([-\d\.]+)', line)
+        if m2:
+            v = _safe_float(m2.group(2))
+            if v is not None:
+                result[m2.group(1)] = v
+
+    _log("debug", f"[PARSER] parse_olt_rx_power: {len(result)} entradas")
+    return result
+
+
 def parse_uncfg_onus(output: str) -> List[Dict]:
     """
     Parseia: show gpon onu uncfg
