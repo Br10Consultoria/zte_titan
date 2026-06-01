@@ -63,18 +63,37 @@ class SimpleTelnet:
             return b""
 
     def _process_iac(self, data: bytes) -> bytes:
-        """Remove negociações IAC do stream Telnet."""
+        """
+        Remove e responde às negociações IAC do stream Telnet.
+        O ZTE C600/C610 envia múltiplas negociações IAC no início da conexão.
+        Responder corretamente evita o 'Connection reset by peer'.
+        """
         out = b""
         i = 0
         while i < len(data):
             if data[i:i+1] == self.IAC:
-                if i + 2 < len(data):
+                if i + 1 < len(data) and data[i+1:i+2] == self.IAC:
+                    # IAC IAC = byte literal 0xFF
+                    out += self.IAC
+                    i += 2
+                elif i + 2 < len(data):
                     cmd = data[i+1:i+2]
                     opt = data[i+2:i+3]
-                    if cmd == self.DO:
-                        self.sock.sendall(self.IAC + self.WONT + opt)
-                    elif cmd == self.WILL:
-                        self.sock.sendall(self.IAC + self.DONT + opt)
+                    try:
+                        if cmd == self.DO:
+                            # Servidor pede que cliente faça algo: recusamos
+                            self.sock.sendall(self.IAC + self.WONT + opt)
+                        elif cmd == self.WILL:
+                            # Servidor vai fazer algo: não queremos
+                            self.sock.sendall(self.IAC + self.DONT + opt)
+                        elif cmd == self.DONT:
+                            # Servidor pede que paremos: confirmamos
+                            self.sock.sendall(self.IAC + self.WONT + opt)
+                        elif cmd == self.WONT:
+                            # Servidor não vai fazer algo: confirmamos
+                            self.sock.sendall(self.IAC + self.DONT + opt)
+                    except Exception:
+                        pass
                     i += 3
                 else:
                     i += 1
@@ -234,37 +253,55 @@ class OLTTelnetClient:
             self.tn = SimpleTelnet(self.ip, self.port, timeout=settings.SSH_TIMEOUT)
             self.tn.open()
 
-            # Aguarda prompt de usuário
-            data = self.tn.read_until(b"Username:", timeout=20)
-            _log("debug", f"[TELNET] Recebido antes de Username: {data[-100:]}")
+            # Aguarda prompt de usuário.
+            # ZTE C600/C610 exibe aviso de segurança antes do prompt:
+            #   "Warning: Telnet is not a secure protocol..."
+            # Precisamos aguardar completamente antes de enviar o login.
+            data = self.tn.read_until(b"Username:", timeout=25)
+            decoded_pre = data.decode("utf-8", errors="replace")
+            _log("debug", f"[TELNET] Recebido antes de Username: {decoded_pre[-200:]}")
+
+            # Pequena pausa para garantir que todas as negociações IAC foram processadas
+            time.sleep(0.3)
             self.tn.write(self.username.encode("ascii") + b"\n")
 
             # Aguarda prompt de senha
             data = self.tn.read_until(b"Password:", timeout=15)
-            _log("debug", f"[TELNET] Recebido antes de Password: {data[-50:]}")
+            _log("debug", f"[TELNET] Recebido antes de Password: {data.decode('utf-8', errors='replace')[-100:]}")
+
+            # Pausa antes de enviar senha (evita reset em equipamentos lentos)
+            time.sleep(0.5)
             self.tn.write(self.password.encode("ascii") + b"\n")
 
-            # Aguarda prompt da OLT (#)
-            data = self.tn.read_until(b"#", timeout=20)
+            # Aguarda prompt da OLT (#).
+            # ZTE C600/C610 exibe banner longo após login:
+            #   "Welcome to TITAN series OLT of ZTE Corporation"
+            # Aguardamos até 30s para o banner completo + prompt.
+            data = self.tn.read_until(b"#", timeout=30)
             decoded = data.decode("utf-8", errors="replace")
-            _log("debug", f"[TELNET] Após login: {decoded[-200:]}")
+            _log("debug", f"[TELNET] Após login: {decoded[-300:]}")
 
             if "#" not in decoded and ">" not in decoded:
-                raise OLTConnectionError(
-                    f"Login Telnet falhou — prompt não encontrado. "
-                    f"Resposta: {decoded[-100:]}"
-                )
+                # Tenta mais uma vez (alguns equipamentos são lentos)
+                extra = self.tn.read_very_eager(wait=2.0)
+                decoded += extra.decode("utf-8", errors="replace")
+                if "#" not in decoded and ">" not in decoded:
+                    raise OLTConnectionError(
+                        f"Login Telnet falhou — prompt não encontrado. "
+                        f"Resposta: {decoded[-200:]}"
+                    )
 
-            # Detecta o prompt real (ex: "GPON_JCSFIBRA#")
+            # Detecta o prompt real (ex: "ENTER#", "GPON_JCSFIBRA#")
             m = re.search(r'([\w\-\.]+)[#>]\s*$', decoded.strip())
             if m:
                 self._prompt = (m.group(1) + "#").encode("ascii")
                 _log("info", f"[TELNET] Prompt detectado: {self._prompt.decode()}")
 
             # Desabilita paginação
+            time.sleep(0.3)
             self.tn.write(b"terminal length 0\n")
-            time.sleep(0.8)
-            self.tn.read_very_eager(wait=0.5)
+            time.sleep(1.0)
+            self.tn.read_very_eager(wait=0.8)
             _log("info", f"[TELNET] Conectado com sucesso a {self.ip}:{self.port}")
 
         except OLTConnectionError:
