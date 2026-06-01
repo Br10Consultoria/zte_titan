@@ -223,3 +223,16 @@ def _migrate_db():
 
         except Exception as e:
             print(f"⚠️  Migração olt_ports: {e}")
+
+        # --- Migração tabela olts ---
+        try:
+            result = conn.execute(sa.text("PRAGMA table_info(olts)"))
+            ocols = {row[1] for row in result.fetchall()}
+
+            if "olt_model" not in ocols:
+                conn.execute(sa.text("ALTER TABLE olts ADD COLUMN olt_model VARCHAR(30) DEFAULT 'zte_c320'"))
+                conn.commit()
+                print("✅ Migração olts: coluna 'olt_model' adicionada")
+
+        except Exception as e:
+            print(f"⚠️  Migração olts: {e}")
