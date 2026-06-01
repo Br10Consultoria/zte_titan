@@ -1,12 +1,14 @@
 """
 Rotas de consulta de ONUs.
-Usa formato ZTE Titan: gpon-olt_SLOT/CARD/PON e gpon-onu_SLOT/CARD/PON:ID
+Suporta múltiplos modelos via olt_driver.py:
+  zte_c320 — ZTE C320/C600/C610/C620/C650 (gpon-olt_1/CARD/PON)
+  zte_c300 — ZTE C300/C300M/C300T Titan   (gpon_olt-SLOT/CARD/PON)
 """
 import re
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 try:
     from zoneinfo import ZoneInfo
@@ -24,11 +26,9 @@ from ..models import User, OLT, OLTPort
 from ..auth import get_current_user
 from ..olt_client import (
     get_olt_client, OLTConnectionError,
-    parse_onu_state, parse_onu_detail, parse_onu_power,
-    parse_onu_baseinfo, parse_uncfg_onus, parse_olt_rx_power,
-    parse_onu_detail_batch,
-    _olt_iface, _onu_iface, get_onu_full_details
+    parse_onu_power, parse_onu_detail, get_onu_full_details
 )
+from ..olt_driver import get_driver
 from ..redis_client import cache
 
 router = APIRouter(prefix="/onus", tags=["ONUs"])
@@ -63,11 +63,12 @@ def get_pon_status(
 ):
     """
     Retorna o status de todas as ONUs de uma porta PON.
-    Interface: gpon-olt_SLOT/CARD/PON
+    Usa o driver correto para o modelo da OLT cadastrada.
     Cache Redis por 24 horas. Use force_refresh=true para atualizar.
     """
     olt = _get_olt_or_404(olt_id, db)
     port_obj = _get_port(olt_id, slot, card, pon, db)
+    driver = get_driver(olt.olt_model)
 
     cache_key = f"olt:{olt_id}:pon:{slot}:{card}:{pon}:status"
 
@@ -79,50 +80,50 @@ def get_pon_status(
             cached_data["cache_expires_in"] = cache_info.get("expires_in")
             return cached_data
 
-    iface = _olt_iface(slot, card, pon)
-    logger.info(f"[PON_STATUS] Consultando {iface} na OLT {olt.ip}")
+    iface = driver.olt_iface(slot, card, pon)
+    logger.info(f"[PON_STATUS] Consultando {iface} na OLT {olt.ip} (modelo: {olt.olt_model})")
 
     try:
         client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
         client.connect()
 
         # Estado das ONUs
-        logger.info(f"[PON_STATUS] Executando: show gpon onu state {iface}")
-        output = client.execute_command(f"show gpon onu state {iface}", timeout=30)
+        cmd_state = driver.cmd_onu_state(iface)
+        logger.info(f"[PON_STATUS] Executando: {cmd_state}")
+        output = client.execute_command(cmd_state, timeout=30)
         logger.info(f"[PON_STATUS] Output bruto ({len(output)} chars): {output[:500]}")
-        onus = parse_onu_state(output)
+        onus = driver.parse_onu_state(output)
         logger.info(f"[PON_STATUS] {len(onus)} ONUs parseadas")
 
-        # Baseinfo (serial + modelo) para enriquecer
-        logger.info(f"[PON_STATUS] Executando: show gpon onu baseinfo {iface}")
-        base_out = client.execute_command(f"show gpon onu baseinfo {iface}", timeout=30)
-        base_list = parse_onu_baseinfo(base_out)
+        # Baseinfo (serial + modelo)
+        cmd_base = driver.cmd_onu_baseinfo(iface)
+        logger.info(f"[PON_STATUS] Executando: {cmd_base}")
+        base_out = client.execute_command(cmd_base, timeout=30)
+        base_list = driver.parse_onu_baseinfo(base_out)
         base_map = {b["onu_index"]: b for b in base_list}
 
-        # RX OLT em batch (show pon power olt-rx)
+        # RX OLT em batch
         rx_map = {}
         try:
-            logger.info(f"[PON_STATUS] Executando: show pon power olt-rx {iface}")
-            rx_out = client.execute_command(f"show pon power olt-rx {iface}", timeout=30)
-            rx_map = parse_olt_rx_power(rx_out)
+            cmd_rx = driver.cmd_olt_rx(iface)
+            logger.info(f"[PON_STATUS] Executando: {cmd_rx}")
+            rx_out = client.execute_command(cmd_rx, timeout=30)
+            rx_map = driver.parse_olt_rx(rx_out)
             logger.info(f"[PON_STATUS] RX coletado para {len(rx_map)} ONUs")
         except Exception as rx_err:
             logger.warning(f"[PON_STATUS] Falha ao coletar RX OLT: {rx_err}")
 
         # Detail-info individual por ONU (description + online_duration)
-        # Executado na mesma sessão Telnet já aberta, sem reconectar
         detail_map = {}
-        MAX_DETAIL = 60  # limite para portas com muitas ONUs
+        MAX_DETAIL = 60
         onus_for_detail = onus[:MAX_DETAIL]
         logger.info(f"[PON_STATUS] Coletando detail-info para {len(onus_for_detail)} ONUs")
         for onu_item in onus_for_detail:
             idx = onu_item["onu_index"]  # ex: 1/1/12:1
-            onu_iface = f"gpon-onu_{idx}"  # ex: gpon-onu_1/1/12:1
+            onu_iface = driver.onu_iface(idx)  # ex: gpon-onu_1/1/12:1 ou gpon_onu-1/1/12:1
             try:
-                det_out = client.execute_command(
-                    f"show gpon onu detail-info {onu_iface}", timeout=10
-                )
-                # Extrai description e online_duration do output individual
+                cmd_detail = driver.cmd_onu_detail(onu_iface)
+                det_out = client.execute_command(cmd_detail, timeout=10)
                 desc = ""
                 m_desc = re.search(r'Description\s*:\s*(\S[^\n]*)', det_out)
                 if m_desc:
@@ -148,7 +149,6 @@ def get_pon_status(
             onu["model"]           = base.get("model", "")
             onu["description"]     = detail.get("description", "")
             onu["online_duration"] = detail.get("online_duration", "")
-            # RX OLT
             rx_val = rx_map.get(idx)
             if rx_val is not None:
                 onu["olt_rx_power"] = rx_val
@@ -177,6 +177,7 @@ def get_pon_status(
             "card":          card,
             "pon":           pon,
             "olt_interface": iface,
+            "olt_model":     olt.olt_model,
             "onus":          onus,
             "total":         len(onus),
             "online":        online,
@@ -215,6 +216,7 @@ def get_onu_full_info(
     - Estado operacional atual
     """
     olt = _get_olt_or_404(olt_id, db)
+    driver = get_driver(olt.olt_model)
     cache_key = f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:full"
 
     if not force_refresh:
@@ -228,7 +230,8 @@ def get_onu_full_info(
     try:
         result = get_onu_full_details(
             olt.ip, olt.port, olt.username, olt.password, olt.protocol,
-            slot, card, pon, onu_id
+            slot, card, pon, onu_id,
+            driver=driver
         )
         result["olt_id"]  = olt_id
         result["cached"]  = False
@@ -254,6 +257,7 @@ def get_unconfigured_onus(
 ):
     """Retorna ONUs não provisionadas (aguardando autorização)."""
     olt = _get_olt_or_404(olt_id, db)
+    driver = get_driver(olt.olt_model)
     cache_key = f"olt:{olt_id}:uncfg"
 
     if not force_refresh:
@@ -265,9 +269,11 @@ def get_unconfigured_onus(
     try:
         client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
         client.connect()
+        # Comando para ONUs não configuradas (igual para todos os modelos ZTE)
         out = client.execute_command("show gpon onu uncfg", timeout=30)
         client.disconnect()
 
+        from ..olt_client import parse_uncfg_onus
         onus = parse_uncfg_onus(out)
         result = {
             "olt_id": olt_id,
@@ -291,6 +297,7 @@ def search_onu(
 ):
     """Busca uma ONU pelo número de série em todas as portas PON."""
     olt = _get_olt_or_404(olt_id, db)
+    driver = get_driver(olt.olt_model)
     ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).all()
 
     if not ports:
@@ -307,9 +314,9 @@ def search_onu(
         client.connect()
 
         for p in ports:
-            iface = _olt_iface(p.slot, p.card, p.pon)
-            out = client.execute_command(f"show gpon onu baseinfo {iface}", timeout=20)
-            onus = parse_onu_baseinfo(out)
+            iface = driver.olt_iface(p.slot, p.card, p.pon)
+            out = client.execute_command(driver.cmd_onu_baseinfo(iface), timeout=20)
+            onus = driver.parse_onu_baseinfo(out)
             for onu in onus:
                 if serial.upper() in onu.get("serial", "").upper():
                     onu["slot"]          = p.slot

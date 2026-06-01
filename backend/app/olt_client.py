@@ -941,18 +941,21 @@ def get_pon_onu_status(ip: str, port: int, username: str, password: str,
 
 def get_onu_full_details(ip: str, port: int, username: str, password: str,
                          protocol: str, slot: int, card: int, pon: int,
-                         onu_id: int) -> Dict:
+                         onu_id: int, driver=None) -> Dict:
     """
-    Obtém todos os detalhes de uma ONU específica:
-    - Estado (show gpon onu state)
-    - Detalhes completos (show gpon onu detail-info)
-    - Potência/atenuação (show pon power attenuation)
-    - Baseinfo (serial, modelo)
+    Obtém todos os detalhes de uma ONU específica.
+    Aceita um driver opcional para suporte multi-modelo.
+    Se driver=None, usa os comandos padrão ZTE C320.
     """
     client = None
     try:
-        onu_ref = _onu_iface(slot, card, pon, onu_id)
-        olt_ref = _olt_iface(slot, card, pon)
+        # Usa driver se fornecido, senão usa funções padrão
+        if driver is not None:
+            onu_ref = driver.onu_iface(f"{slot}/{card}/{pon}:{onu_id}")
+            olt_ref = driver.olt_iface(slot, card, pon)
+        else:
+            onu_ref = _onu_iface(slot, card, pon, onu_id)
+            olt_ref = _olt_iface(slot, card, pon)
         onu_idx = f"{slot}/{card}/{pon}:{onu_id}"
 
         _log("info", f"[ONU_FULL] Coletando detalhes de {onu_ref}")
@@ -966,21 +969,24 @@ def get_onu_full_details(ip: str, port: int, username: str, password: str,
         }
 
         # 1. Estado detalhado
-        _log("info", f"[ONU_FULL] show gpon onu detail-info {onu_ref}")
-        out = client.execute_command(f"show gpon onu detail-info {onu_ref}", timeout=20)
+        cmd_detail = driver.cmd_onu_detail(onu_ref) if driver else f"show gpon onu detail-info {onu_ref}"
+        _log("info", f"[ONU_FULL] {cmd_detail}")
+        out = client.execute_command(cmd_detail, timeout=20)
         result["detail"] = parse_onu_detail(out, onu_idx)
 
         # 2. Potência e atenuação
-        _log("info", f"[ONU_FULL] show pon power attenuation {onu_ref}")
-        out = client.execute_command(f"show pon power attenuation {onu_ref}", timeout=15)
+        cmd_power = driver.cmd_onu_power(onu_ref) if driver else f"show pon power attenuation {onu_ref}"
+        _log("info", f"[ONU_FULL] {cmd_power}")
+        out = client.execute_command(cmd_power, timeout=15)
         _log("debug", f"[ONU_FULL] Output bruto power attenuation ({len(out)} chars): {repr(out[:500])}")
         result["power"] = parse_onu_power(out, onu_idx)
         _log("debug", f"[ONU_FULL] Power parsed: {result['power']}")
 
         # 3. Estado operacional (da lista da porta)
-        _log("info", f"[ONU_FULL] show gpon onu state {olt_ref}")
-        out = client.execute_command(f"show gpon onu state {olt_ref}", timeout=20)
-        all_states = parse_onu_state(out)
+        cmd_state = driver.cmd_onu_state(olt_ref) if driver else f"show gpon onu state {olt_ref}"
+        _log("info", f"[ONU_FULL] {cmd_state}")
+        out = client.execute_command(cmd_state, timeout=20)
+        all_states = driver.parse_onu_state(out) if driver else parse_onu_state(out)
         for s in all_states:
             if s["onu_index"] == onu_idx or s["onu_index"].endswith(f":{onu_id}"):
                 result["status"] = s

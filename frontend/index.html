@@ -1321,6 +1321,14 @@
         </div>
         <div><label class="form-label">Usuário *</label><input x-model="oltForm.username" type="text" class="input-field" /></div>
         <div><label class="form-label">Senha *</label><input x-model="oltForm.password" type="password" class="input-field" :placeholder="oltModalEdit ? '(manter atual)' : 'Senha'" /></div>
+        <div><label class="form-label">Modelo / Fabricante *</label>
+          <select x-model="oltForm.olt_model" class="input-field">
+            <optgroup label="ZTE">
+              <option value="zte_c320">ZTE C320 / C600 / C610 / C620 / C650</option>
+              <option value="zte_c300">ZTE C300 / C300M / C300T (Titan)</option>
+            </optgroup>
+          </select>
+        </div>
         <div><label class="form-label">SNMP Community</label><input x-model="oltForm.snmp_community" type="text" class="input-field" /></div>
         <div><label class="form-label">SNMP Version</label>
           <select x-model="oltForm.snmp_version" class="input-field">

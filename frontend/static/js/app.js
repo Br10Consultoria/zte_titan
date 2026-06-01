@@ -29,7 +29,7 @@ function app() {
     olts: [],
     oltModal: false,
     oltModalEdit: false,
-    oltForm: { name: '', ip: '', port: 22, username: '', password: '', protocol: 'ssh', snmp_community: 'public', snmp_version: '2c' },
+    oltForm: { name: '', ip: '', port: 22, username: '', password: '', protocol: 'ssh', snmp_community: 'public', snmp_version: '2c', olt_model: 'zte_c320' },
     oltEditId: null,
     selectedOLTPorts: null,
     selectedOLTForPorts: null,
@@ -284,14 +284,14 @@ function app() {
     openOLTModal() {
       this.oltModalEdit = false;
       this.oltEditId = null;
-      this.oltForm = { name: '', ip: '', port: 22, username: '', password: '', protocol: 'ssh', snmp_community: 'public', snmp_version: '2c' };
+      this.oltForm = { name: '', ip: '', port: 22, username: '', password: '', protocol: 'ssh', snmp_community: 'public', snmp_version: '2c', olt_model: 'zte_c320' };
       this.oltModal = true;
     },
 
     editOLT(olt) {
       this.oltModalEdit = true;
       this.oltEditId = olt.id;
-      this.oltForm = { name: olt.name, ip: olt.ip, port: olt.port, username: olt.username, password: '', protocol: olt.protocol, snmp_community: olt.snmp_community || 'public', snmp_version: olt.snmp_version || '2c' };
+      this.oltForm = { name: olt.name, ip: olt.ip, port: olt.port, username: olt.username, password: '', protocol: olt.protocol, snmp_community: olt.snmp_community || 'public', snmp_version: olt.snmp_version || '2c', olt_model: olt.olt_model || 'zte_c320' };
       this.oltModal = true;
     },
 

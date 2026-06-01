@@ -85,6 +85,7 @@ class OLTCreate(BaseModel):
     protocol: str = "telnet"
     snmp_community: Optional[str] = None
     snmp_version: Optional[str] = "2c"
+    olt_model: Optional[str] = "zte_c320"  # chave do driver
 
 
 class OLTUpdate(BaseModel):
@@ -96,6 +97,7 @@ class OLTUpdate(BaseModel):
     protocol: Optional[str] = None
     snmp_community: Optional[str] = None
     snmp_version: Optional[str] = None
+    olt_model: Optional[str] = None
 
 
 class OLTResponse(BaseModel):
@@ -109,6 +111,7 @@ class OLTResponse(BaseModel):
     snmp_version: Optional[str] = None
     status: str
     model: Optional[str] = None
+    olt_model: Optional[str] = None
     firmware: Optional[str] = None
     last_check: Optional[datetime] = None
     created_at: datetime
