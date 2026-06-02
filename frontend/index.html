@@ -78,7 +78,7 @@
       background: var(--bg-base);
       color: var(--text-primary);
       font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-      font-size: 13px;
+      font-size: 11px;
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
       transition: background 0.3s, color 0.3s;
@@ -680,7 +680,7 @@
   <!-- ══════════════════════════════════════════════════════════════ -->
   <!-- LOGIN                                                          -->
   <!-- ══════════════════════════════════════════════════════════════ -->
-  <div x-show="!isLoggedIn" class="login-wrap">
+  <div x-show="!isLoggedIn" class="login-wrap" :class="lightTheme ? 'light-theme' : ''" x-init="lightTheme = localStorage.getItem('br10_theme') === 'light'">
     <div class="login-card">
       <div class="login-logo">
         <template x-if="logoExists">
