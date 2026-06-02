@@ -5,7 +5,7 @@ function app() {
     // Branding
     logoExists: false,
     logoSrc: '/static/img/logo.png',
-    appTitle: 'ZTE TITAN',
+    appTitle: 'Br10Manager OLTS',
 
     // Auth
     isLoggedIn: false,
