@@ -221,6 +221,12 @@ def _migrate_db():
                 conn.commit()
                 print("✅ Migração: coluna 'card' adicionada")
 
+            # Garante que onu_max existe (capacidade máxima da PON, padrão 128)
+            if "onu_max" not in cols:
+                conn.execute(sa.text("ALTER TABLE olt_ports ADD COLUMN onu_max INTEGER DEFAULT 128"))
+                conn.commit()
+                print("✅ Migração: coluna 'onu_max' adicionada (capacidade PON)")
+
         except Exception as e:
             print(f"⚠️  Migração olt_ports: {e}")
 

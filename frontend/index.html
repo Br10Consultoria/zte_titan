@@ -905,19 +905,44 @@
               </div>
               <div class="table-wrap">
                 <table>
-                  <thead><tr><th>Interface</th><th>Slot</th><th>Card</th><th>PON</th><th>Tipo</th><th>Status</th><th>ONUs</th><th>Ações</th></tr></thead>
+                  <thead><tr><th>Interface</th><th>Slot</th><th>Card</th><th>PON</th><th>Tipo</th><th>Status</th><th style="min-width:180px">Capacidade (ONUs / 128)</th><th>Ações</th></tr></thead>
                   <tbody>
                     <template x-for="p in selectedOLTPorts" :key="p.id">
                       <tr>
-                        <td class="td-mono" style="color:#79c0ff" x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.pon"></td>
+                        <td class="td-mono" style="color:#79c0ff" x-text="(selectedOLTForPorts && selectedOLTForPorts.olt_model === 'zte_c300') ? 'gpon_olt-'+p.slot+'/'+(p.card||1)+'/'+p.pon : 'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.pon"></td>
                         <td x-text="p.slot"></td>
                         <td x-text="p.card || 1"></td>
                         <td x-text="p.pon"></td>
                         <td><span class="badge badge-blue" x-text="p.port_type ? p.port_type.toUpperCase() : 'GPON'"></span></td>
                         <td><span :class="p.status==='online'?'badge badge-green':p.status==='active'?'badge badge-blue':'badge badge-gray'" x-text="p.status"></span></td>
                         <td>
-                          <span style="font-weight:700;color:var(--text-primary)" x-text="p.onu_count"></span>
-                          <span style="color:var(--text-muted)"> ONUs</span>
+                          <div style="min-width:160px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                              <span style="font-size:12px;font-weight:700" :style="{
+                                color: p.onu_count >= 115 ? '#f85149' :
+                                       p.onu_count >= 90  ? '#e3b341' :
+                                       p.onu_count >= 64  ? '#58a6ff' : '#3fb950'
+                              }" x-text="p.onu_count + ' / 128'"></span>
+                              <span style="font-size:11px;color:var(--text-muted)" x-text="Math.round(p.onu_count/128*100) + '%'"></span>
+                            </div>
+                            <div style="background:var(--border);border-radius:4px;height:8px;overflow:hidden">
+                              <div :style="{
+                                width: Math.min(p.onu_count/128*100, 100) + '%',
+                                height: '100%',
+                                borderRadius: '4px',
+                                transition: 'width 0.4s ease',
+                                background: p.onu_count >= 115 ? '#f85149' :
+                                            p.onu_count >= 90  ? '#e3b341' :
+                                            p.onu_count >= 64  ? '#58a6ff' : '#3fb950'
+                              }"></div>
+                            </div>
+                            <div x-show="p.onu_count >= 115" style="font-size:10px;color:#f85149;margin-top:3px;font-weight:600">
+                              <i class="fas fa-exclamation-triangle"></i> PON CHEIA
+                            </div>
+                            <div x-show="p.onu_count >= 90 && p.onu_count < 115" style="font-size:10px;color:#e3b341;margin-top:3px;font-weight:600">
+                              <i class="fas fa-exclamation-circle"></i> Atenção
+                            </div>
+                          </div>
                         </td>
                         <td>
                           <button @click="openONUsByPort(selectedOLTForPorts, p)" class="btn btn-primary btn-xs">
@@ -957,7 +982,7 @@
                     <option value="">Selecione a PON</option>
                     <template x-for="p in filteredPorts" :key="p.id">
                       <option :value="p.id + '|' + p.slot + '|' + (p.card||1) + '|' + p.pon"
-                              x-text="'gpon-olt_'+p.slot+'/'+(p.card||1)+'/'+p.pon+' ('+p.onu_count+' ONUs)'"></option>
+                              x-text="(filteredPorts.length > 0 && filteredPorts[0] && olts.find(o=>o.id==onuFilter.olt_id) && olts.find(o=>o.id==onuFilter.olt_id).olt_model === 'zte_c300' ? 'gpon_olt-' : 'gpon-olt_')+p.slot+'/'+(p.card||1)+'/'+p.pon+' — '+p.onu_count+'/128 ONUs'+(p.onu_count>=115?' ⚠️ CHEIA':p.onu_count>=90?' ⚠️ Atenção':'')"></option>
                     </template>
                   </select>
                 </div>

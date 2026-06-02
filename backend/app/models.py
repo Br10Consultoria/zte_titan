@@ -59,6 +59,7 @@ class OLTPort(Base):
     description = Column(String(200), nullable=True)
     status = Column(String(20), default="unknown")
     onu_count = Column(Integer, default=0)
+    onu_max = Column(Integer, default=128)   # capacidade máxima da PON
     discovered_at = Column(DateTime, default=datetime.utcnow)
 
     olt = relationship("OLT", back_populates="ports")

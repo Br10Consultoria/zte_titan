@@ -130,6 +130,7 @@ class OLTPortResponse(BaseModel):
     description: Optional[str] = None
     status: str
     onu_count: int
+    onu_max: int = 128   # capacidade máxima da PON (padrão 128)
     discovered_at: datetime
 
     class Config:
