@@ -43,6 +43,35 @@
       --sidebar-w-sm:   62px;
       --topbar-h:       56px;
     }
+    /* ── Tema Claro ─────────────────────────────────────────────── */
+    body.light-theme {
+      --bg-base:        #f0f4ff;
+      --bg-surface:     #ffffff;
+      --bg-card:        #ffffff;
+      --bg-hover:       #e8f0fe;
+      --bg-input:       #f8faff;
+      --border:         #c5d5f0;
+      --border-dim:     #dce8fb;
+      --text-primary:   #0d1b3e;
+      --text-secondary: #2d5080;
+      --text-muted:     #7fa8d4;
+      --accent:         #1a6ff5;
+      --accent-dark:    #1255c9;
+      --accent-glow:    rgba(26,111,245,0.1);
+      --accent-border:  rgba(26,111,245,0.3);
+      --green:          #0d9e6e;
+      --green-glow:     rgba(13,158,110,0.1);
+      --red:            #d93025;
+      --red-glow:       rgba(217,48,37,0.1);
+      --yellow:         #c07800;
+      --yellow-glow:    rgba(192,120,0,0.1);
+      --purple:         #5c5fe8;
+      --purple-glow:    rgba(92,95,232,0.1);
+      --cyan:           #0099cc;
+      --cyan-glow:      rgba(0,153,204,0.1);
+      --brand-gradient: linear-gradient(135deg, #1a3a8f 0%, #1a6ff5 50%, #00aaff 100%);
+      --brand-glow:     0 0 24px rgba(26,111,245,0.2);
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
     body {
@@ -52,6 +81,7 @@
       font-size: 13px;
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+      transition: background 0.3s, color 0.3s;
     }
 
     /* ── Scrollbar ─────────────────────────────────────────────── */
@@ -172,6 +202,70 @@
     .user-info { min-width: 0; overflow: hidden; }
     .user-name { color: var(--text-primary); font-weight: 700; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .user-role { color: var(--text-muted); font-size: 10.5px; }
+
+    /* ── Tema Claro: overrides de componentes com background fixo ── */
+    body.light-theme .sidebar {
+      background: linear-gradient(180deg, #ffffff 0%, #f0f4ff 100%);
+      border-right: 1px solid rgba(26,111,245,0.15);
+      box-shadow: 2px 0 16px rgba(26,111,245,0.08);
+    }
+    body.light-theme .sidebar-logo {
+      background: linear-gradient(135deg, rgba(26,58,143,0.06) 0%, rgba(26,111,245,0.04) 100%);
+      border-bottom: 1px solid rgba(26,111,245,0.12);
+    }
+    body.light-theme .topbar {
+      background: linear-gradient(90deg, #ffffff 0%, #f0f4ff 100%);
+      border-bottom: 1px solid rgba(26,111,245,0.15);
+      box-shadow: 0 2px 12px rgba(26,111,245,0.08);
+    }
+    body.light-theme .card {
+      box-shadow: 0 2px 12px rgba(26,111,245,0.08);
+      border: 1px solid rgba(26,111,245,0.12);
+    }
+    body.light-theme .card-header {
+      background: linear-gradient(90deg, rgba(26,58,143,0.05) 0%, rgba(240,244,255,0.9) 100%);
+      border-bottom: 1px solid rgba(26,111,245,0.1);
+    }
+    body.light-theme .modal {
+      background: #ffffff;
+      border: 1px solid rgba(26,111,245,0.2);
+      box-shadow: 0 20px 60px rgba(26,111,245,0.15);
+    }
+    body.light-theme thead th {
+      background: linear-gradient(90deg, rgba(26,58,143,0.06) 0%, rgba(240,244,255,0.8) 100%);
+      border-bottom: 1px solid rgba(26,111,245,0.12);
+    }
+    body.light-theme tbody tr:hover { background: rgba(26,111,245,0.04); }
+    body.light-theme .stat-card { box-shadow: 0 2px 8px rgba(26,111,245,0.08); }
+    body.light-theme .login-card {
+      background: #ffffff;
+      border: 1px solid rgba(26,111,245,0.2);
+      box-shadow: 0 16px 48px rgba(26,111,245,0.12);
+    }
+    body.light-theme .login-wrap {
+      background:
+        radial-gradient(ellipse at 60% 10%, rgba(26,111,245,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 10% 90%, rgba(26,58,143,0.08) 0%, transparent 50%),
+        #f0f4ff;
+    }
+    body.light-theme .nav-item:hover { background: rgba(26,111,245,0.08); }
+    body.light-theme .sidebar-user { border-top: 1px solid rgba(26,111,245,0.12); }
+    body.light-theme .sidebar-legend { border-top: 1px solid rgba(26,111,245,0.12); }
+
+    /* ── Botão de tema ─────────────────────────────────────── */
+    .theme-toggle {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-hover);
+      color: var(--text-secondary);
+      transition: all 0.2s;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .theme-toggle:hover { color: var(--accent); border-color: var(--accent-border); background: var(--accent-glow); }
 
     /* ── Topbar ────────────────────────────────────────────────── */
     .topbar {
@@ -796,6 +890,11 @@
             <span class="power-dot" :class="stats.redis ? 'power-normal' : 'power-critical'"></span>
             <span x-text="stats.redis ? 'Redis Online' : 'Redis Offline'"></span>
           </span>
+          <div style="width:1px;height:20px;background:var(--border-dim)"></div>
+          <!-- Botão de tema -->
+          <button @click="toggleTheme()" class="theme-toggle" :title="lightTheme ? 'Mudar para tema escuro' : 'Mudar para tema claro'">
+            <i :class="lightTheme ? 'fas fa-moon' : 'fas fa-sun'"></i>
+          </button>
           <div style="width:1px;height:20px;background:var(--border-dim)"></div>
           <div style="display:flex;align-items:center;gap:7px">
             <div class="user-avatar" style="width:28px;height:28px;font-size:11px" x-text="currentUser ? currentUser.username[0].toUpperCase() : 'U'"></div>
