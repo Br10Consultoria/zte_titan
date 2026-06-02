@@ -684,6 +684,64 @@
         <div @click="setPage('profile')" :class="{'active': page==='profile'}" class="nav-item" title="Meu Perfil">
           <i class="fas fa-user-gear"></i><span class="nav-label">Meu Perfil</span>
         </div>
+
+        <!-- Legenda de Estados (retrátil) -->
+        <div x-show="!sidebarCollapsed" x-data="{ legendOpen: false }" style="margin-top:8px">
+          <div @click="legendOpen = !legendOpen"
+               style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;cursor:pointer;border-top:1px solid var(--border);border-radius:6px;user-select:none"
+               :style="legendOpen ? 'background:var(--surface-2)' : ''">
+            <span style="font-size:9.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em">
+              <i class="fas fa-circle-info mr-1" style="color:var(--purple)"></i> Estados ONU
+            </span>
+            <i :class="legendOpen ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" style="font-size:10px;color:var(--text-muted)"></i>
+          </div>
+          <div x-show="legendOpen"
+               x-transition:enter="transition ease-out duration-150"
+               x-transition:enter-start="opacity-0 -translate-y-1"
+               x-transition:enter-end="opacity-100 translate-y-0"
+               class="sidebar-legend" style="border-top:none;margin-top:0">
+            <div class="legend-row" title="Cliente online e funcionando">
+              <span class="legend-dot legend-dot-green"></span>
+              <span class="legend-label">working</span>
+              <span class="legend-desc">Online</span>
+            </div>
+            <div class="legend-row" title="Falta de energia elétrica na ONU">
+              <span class="legend-dot legend-dot-yellow"></span>
+              <span class="legend-label">DyingGasp</span>
+              <span class="legend-desc">Sem energia</span>
+            </div>
+            <div class="legend-row" title="Perda de sinal óptico (fibra cortada ou conector ruim)">
+              <span class="legend-dot legend-dot-red"></span>
+              <span class="legend-label">LOS/LOSi</span>
+              <span class="legend-desc">Fibra cortada</span>
+            </div>
+            <div class="legend-row" title="Perda de sincronismo GPON">
+              <span class="legend-dot legend-dot-red"></span>
+              <span class="legend-label">LOF</span>
+              <span class="legend-desc">Problema GPON</span>
+            </div>
+            <div class="legend-row" title="ONU reiniciou">
+              <span class="legend-dot legend-dot-blue"></span>
+              <span class="legend-label">Reboot</span>
+              <span class="legend-desc">Reiniciou</span>
+            </div>
+            <div class="legend-row" title="Falha de comunicação OMCI">
+              <span class="legend-dot legend-dot-yellow"></span>
+              <span class="legend-label">OMCI Down</span>
+              <span class="legend-desc">Falha OMCI</span>
+            </div>
+            <div class="legend-row" title="ONU desligada">
+              <span class="legend-dot legend-dot-gray"></span>
+              <span class="legend-label">PowerOff</span>
+              <span class="legend-desc">Desligada</span>
+            </div>
+            <div class="legend-row" title="Sinal óptico fraco (RX OLT abaixo de -28 dBm)">
+              <span class="legend-dot" style="background:linear-gradient(135deg,#ff7b72,#e3b341)"></span>
+              <span class="legend-label">RX &lt; -28</span>
+              <span class="legend-desc">Sinal ruim</span>
+            </div>
+          </div>
+        </div>
       </nav>
 
       <!-- User -->
@@ -700,61 +758,6 @@
         </button>
       </div>
 
-      <!-- Legenda de Estados (retrátil) -->
-      <div x-show="!sidebarCollapsed" x-data="{ legendOpen: false }">
-        <!-- Botão para expandir/retrair -->
-        <div @click="legendOpen = !legendOpen"
-             style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;border-top:1px solid var(--border);margin-top:8px;user-select:none"
-             :style="legendOpen ? 'background:var(--surface-2)' : ''">
-          <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">
-            <i class="fas fa-circle-info mr-1" style="color:var(--purple)"></i> Estados ONU
-          </span>
-          <i :class="legendOpen ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" style="font-size:10px;color:var(--text-muted)"></i>
-        </div>
-        <!-- Conteúdo retrátil -->
-        <div x-show="legendOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="sidebar-legend" style="border-top:none;margin-top:0">
-          <div class="legend-row" title="Cliente online e funcionando">
-            <span class="legend-dot legend-dot-green"></span>
-            <span class="legend-label">working</span>
-            <span class="legend-desc">Online</span>
-          </div>
-          <div class="legend-row" title="Falta de energia elétrica na ONU">
-            <span class="legend-dot legend-dot-yellow"></span>
-            <span class="legend-label">DyingGasp</span>
-            <span class="legend-desc">Sem energia</span>
-          </div>
-          <div class="legend-row" title="Perda de sinal óptico (fibra cortada ou conector ruim)">
-            <span class="legend-dot legend-dot-red"></span>
-            <span class="legend-label">LOS/LOSi</span>
-            <span class="legend-desc">Fibra cortada</span>
-          </div>
-          <div class="legend-row" title="Perda de sincronismo GPON">
-            <span class="legend-dot legend-dot-red"></span>
-            <span class="legend-label">LOF</span>
-            <span class="legend-desc">Problema GPON</span>
-          </div>
-          <div class="legend-row" title="ONU reiniciou">
-            <span class="legend-dot legend-dot-blue"></span>
-            <span class="legend-label">Reboot</span>
-            <span class="legend-desc">Reiniciou</span>
-          </div>
-          <div class="legend-row" title="Falha de comunicação OMCI">
-            <span class="legend-dot legend-dot-yellow"></span>
-            <span class="legend-label">OMCI Down</span>
-            <span class="legend-desc">Falha OMCI</span>
-          </div>
-          <div class="legend-row" title="ONU desligada">
-            <span class="legend-dot legend-dot-gray"></span>
-            <span class="legend-label">PowerOff</span>
-            <span class="legend-desc">Desligada</span>
-          </div>
-          <div class="legend-row" title="Sinal óptico fraco (RX OLT abaixo de -28 dBm)">
-            <span class="legend-dot" style="background:linear-gradient(135deg,#ff7b72,#e3b341)"></span>
-            <span class="legend-label">RX &lt; -28</span>
-            <span class="legend-desc">Sinal ruim</span>
-          </div>
-        </div>
-      </div>
     </aside>
 
     <!-- ── Main wrap ────────────────────────────────────────────── -->
