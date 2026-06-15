@@ -3,18 +3,18 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Instala dependências do sistema, timezone e ferramentas SNMP
+# snmp-mibs-downloader não está disponível no Debian Trixie main — usamos apenas snmp (snmpwalk)
 RUN apt-get update && apt-get install -y \
     gcc \
     libffi-dev \
     tzdata \
     snmp \
-    snmp-mibs-downloader \
     && ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime \
     && echo "America/Sao_Paulo" > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
-# Habilita MIBs SNMP
-RUN echo 'mibs +ALL' >> /etc/snmp/snmp.conf 2>/dev/null || true
+# Desabilita aviso de MIBs não carregadas (funciona sem MIBs para descoberta por ifName)
+RUN mkdir -p /etc/snmp && echo 'mibs :' > /etc/snmp/snmp.conf
 
 ENV TZ=America/Sao_Paulo
 
