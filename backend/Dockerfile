@@ -20,8 +20,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia o código do backend
 COPY . .
 
-# Copia o frontend para ser servido pelo FastAPI
-COPY ../frontend /app/frontend
+# O frontend agora é mapeado via volume no docker-compose.yml
+# COPY ../frontend /app/frontend
 
 # Cria diretório para o banco de dados
 RUN mkdir -p /app/data
