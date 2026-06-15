@@ -335,11 +335,27 @@ class OLTTelnetClient:
                 self._prompt = (m.group(1) + "#").encode("ascii")
                 _log("info", f"[TELNET] Prompt detectado: {self._prompt.decode()}")
 
-            # Desabilita paginação
+            # Desabilita paginação — tenta múltiplos comandos por compatibilidade
+            # Algumas OLTs (ex: ZTE C300 ARAMARI) entram em estado inconsistente
+            # após 'terminal length 0' e passam a retornar %Code 62310-GPONSRV.
+            # Tentamos em ordem: terminal length 0 → screen-length 0 temporary → skip
             time.sleep(0.3)
-            self.tn.write(b"terminal length 0\n")
-            time.sleep(1.0)
-            self.tn.read_very_eager(wait=0.8)
+            self._pagination_disabled = False
+            for pag_cmd in [b"terminal length 0\n", b"screen-length 0 temporary\n"]:
+                self.tn.write(pag_cmd)
+                time.sleep(0.8)
+                resp = self.tn.read_very_eager(wait=0.6)
+                resp_str = resp.decode("utf-8", errors="replace")
+                # Se a OLT retornou erro para este comando, tenta o próximo
+                if "%Error" in resp_str or "%error" in resp_str:
+                    _log("debug", f"[TELNET] Paginação '{pag_cmd.strip()}' falhou: {resp_str[:80]}")
+                    continue
+                # Comando aceito
+                self._pagination_disabled = True
+                _log("debug", f"[TELNET] Paginação desabilitada com: {pag_cmd.decode().strip()}")
+                break
+            if not self._pagination_disabled:
+                _log("warning", "[TELNET] Não foi possível desabilitar paginação — outputs longos podem ser truncados")
             _log("info", f"[TELNET] Conectado com sucesso a {self.ip}:{self.port}")
 
         except OLTConnectionError:
