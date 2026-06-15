@@ -252,7 +252,9 @@ def discover_ports(
             client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
             client.connect()
 
-            # Estratégia 1: listar todas as interfaces de uma vez
+            # Estratégia 1: listar portas que já têm ONUs ativas via 'show gpon onu state'
+            # ATENÇÃO: este comando só retorna portas COM ONUs — portas vazias não aparecem.
+            # Por isso, sempre complementamos com varredura porta a porta (Estratégia 2).
             for cmd in driver.cmd_discover_ports():
                 logger.info(f"[DISCOVER] Tentando: {cmd}")
                 output = client.execute_command(cmd, timeout=20)
@@ -262,43 +264,54 @@ def discover_ports(
                     if key not in {(x["slot"], x.get("card", 1), x["pon"]) for x in ports}:
                         ports.append(p)
                 if ports:
-                    logger.info(f"[DISCOVER] Encontradas {len(ports)} portas via '{cmd}'")
+                    logger.info(f"[DISCOVER] Estratégia 1 encontrou {len(ports)} portas com ONUs via '{cmd}'")
                     break
 
-            # Estratégia 2: varredura slot/card/pon
+            # Estratégia 2: varredura porta a porta para encontrar TODAS as portas,
+            # incluindo as que estão vazias (sem ONUs ativas).
+            # Sempre executada para complementar a Estratégia 1.
             # Para C300/C610: slot=1..2, card=1..8, pon=1..32
             # Para C320:      slot=1 (fixo), card=1..8, pon=1..32
-            # Limites generosos para cobrir C320/C300/C610/C620/C650 com até 8 placas e 32 PONs por placa
-            if not ports:
-                logger.info("[DISCOVER] Iniciando varredura slot/card/pon")
-                seen = set()
-                is_c300 = getattr(driver, 'model_key', '') == 'zte_c300'
-                slot_range = range(1, 3) if is_c300 else range(1, 2)  # C300: slots 1-2; C320: slot 1 fixo
-                card_range = range(1, 9)   # até 8 placas (cobre C320/C300/C610/C620/C650)
-                for slot in slot_range:
-                    for card in card_range:
-                        for pon in range(1, 33):  # até 32 PONs por placa
-                            key = (slot, card, pon)
-                            if key in seen:
-                                continue
-                            iface = driver.olt_iface(slot, card, pon)
-                            logger.info(f"[DISCOVER] Testando {iface}")
-                            try:
-                                out = client.execute_command(
-                                    driver.cmd_onu_state(iface), timeout=8
-                                )
-                                if driver.parse_onu_state_for_discover(out, slot, card, pon):
-                                    seen.add(key)
-                                    ports.append({
-                                        "slot": slot, "card": card, "pon": pon,
-                                        "port_type": "gpon",
-                                        "description": iface
-                                    })
-                                    logger.info(f"[DISCOVER] Porta válida: {iface}")
-                                else:
-                                    logger.debug(f"[DISCOVER] {iface}: sem ONUs ou porta inválida")
-                            except Exception as ex:
-                                logger.debug(f"[DISCOVER] {iface} inválida: {ex}")
+            logger.info("[DISCOVER] Iniciando varredura porta a porta para descobrir portas vazias")
+            seen = {(p["slot"], p.get("card", 1), p["pon"]) for p in ports}  # já encontradas
+            is_c300 = getattr(driver, 'model_key', '') == 'zte_c300'
+            slot_range = range(1, 3) if is_c300 else range(1, 2)  # C300: slots 1-2; C320: slot 1 fixo
+            card_range = range(1, 9)   # até 8 placas (cobre C320/C300/C610/C620/C650)
+            consecutive_empty = 0  # para parar cedo quando não há mais placas
+            for slot in slot_range:
+                for card in card_range:
+                    card_has_any = False
+                    for pon in range(1, 33):  # até 32 PONs por placa
+                        key = (slot, card, pon)
+                        if key in seen:
+                            card_has_any = True
+                            continue
+                        iface = driver.olt_iface(slot, card, pon)
+                        try:
+                            out = client.execute_command(
+                                driver.cmd_onu_state(iface), timeout=8
+                            )
+                            if driver.parse_onu_state_for_discover(out, slot, card, pon):
+                                seen.add(key)
+                                card_has_any = True
+                                ports.append({
+                                    "slot": slot, "card": card, "pon": pon,
+                                    "port_type": "gpon",
+                                    "description": iface
+                                })
+                                logger.info(f"[DISCOVER] Porta encontrada: {iface}")
+                            else:
+                                logger.debug(f"[DISCOVER] {iface}: sem ONUs ou porta inválida")
+                        except Exception as ex:
+                            logger.debug(f"[DISCOVER] {iface} inválida: {ex}")
+                    # Se nenhuma PON da placa respondeu, incrementa contador de placas vazias
+                    if not card_has_any:
+                        consecutive_empty += 1
+                        if consecutive_empty >= 2:
+                            logger.info(f"[DISCOVER] 2 placas consecutivas sem portas (card={card}), encerrando varredura")
+                            break
+                    else:
+                        consecutive_empty = 0
 
             client.disconnect()
             logger.info(f"[DISCOVER] SSH/Telnet encontrou {len(ports)} portas")
