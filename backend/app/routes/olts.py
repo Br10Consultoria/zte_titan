@@ -266,17 +266,18 @@ def discover_ports(
                     break
 
             # Estratégia 2: varredura slot/card/pon
-            # Para C300/C610: slot=1..2, card=1..2, pon=1..16
-            # Para C320:      slot=1 (fixo), card=1..4, pon=1..16
+            # Para C300/C610: slot=1..2, card=1..8, pon=1..32
+            # Para C320:      slot=1 (fixo), card=1..8, pon=1..32
+            # Limites generosos para cobrir C320/C300/C610/C620/C650 com até 8 placas e 32 PONs por placa
             if not ports:
                 logger.info("[DISCOVER] Iniciando varredura slot/card/pon")
                 seen = set()
                 is_c300 = getattr(driver, 'model_key', '') == 'zte_c300'
                 slot_range = range(1, 3) if is_c300 else range(1, 2)  # C300: slots 1-2; C320: slot 1 fixo
-                card_range = range(1, 3) if is_c300 else range(1, 5)  # C300: cards 1-2; C320: cards 1-4
+                card_range = range(1, 9)   # até 8 placas (cobre C320/C300/C610/C620/C650)
                 for slot in slot_range:
                     for card in card_range:
-                        for pon in range(1, 17):
+                        for pon in range(1, 33):  # até 32 PONs por placa
                             key = (slot, card, pon)
                             if key in seen:
                                 continue

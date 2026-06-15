@@ -315,7 +315,7 @@ def snmp_discover_pon_ports(host: str, community: str, port: int = 161,
                     diff = if_index - base
                     slot = diff // 65536 + 1
                     pon_num = (diff % 65536) // 256 + 1
-                    if not (1 <= slot <= 16 and 1 <= pon_num <= 16):
+                    if not (1 <= slot <= 16 and 1 <= pon_num <= 32):
                         continue
 
                     if_name = f"gpon-olt_1/{slot}/{pon_num}"
