@@ -508,17 +508,18 @@ class ZTEC320Driver(OLTDriver):
 
 class ZTEC300Driver(OLTDriver):
     """
-    Driver para ZTE C300/C300M/C300T (linha Titan).
-    Formato de interface: gpon_olt-SLOT/CARD/PON  |  gpon_onu-SLOT/CARD/PON:ID
-    Nota: underline e hífen são INVERTIDOS em relação ao C320!
+    Driver para ZTE C300/C300M/C300T.
+    Formato de interface: gpon-olt_SLOT/CARD/PON  |  gpon-onu_SLOT/CARD/PON:ID
+    Mesmo formato do C320 (hífen antes do underline).
+    Confirmado na OLT C300 ARAMARI: 'show gpon onu state gpon-olt_1/2/1' funciona.
     """
     model_key = "zte_c300"
 
     def olt_iface(self, slot: int, card: int, pon: int) -> str:
-        return f"gpon_olt-{slot}/{card}/{pon}"
+        return f"gpon-olt_{slot}/{card}/{pon}"
 
     def _onu_iface_parts(self, slot: int, card: int, pon: int, onu_id: int) -> str:
-        return f"gpon_onu-{slot}/{card}/{pon}:{onu_id}"
+        return f"gpon-onu_{slot}/{card}/{pon}:{onu_id}"
 
     def cmd_onu_state(self, olt_iface: str) -> str:
         # C300 aceita sem interface (lista todas) ou com interface específica
@@ -601,16 +602,16 @@ class ZTEC300Driver(OLTDriver):
 
     def parse_onu_baseinfo(self, output: str) -> List[Dict]:
         """
-        Parseia: show gpon onu baseinfo gpon_olt-SLOT/CARD/PON
-        Formato C300: gpon_onu-1/1/1:1    ZTE-F601V6.0    sn      SN:DACMED108DFA    ready
+        Parseia: show gpon onu baseinfo gpon-olt_SLOT/CARD/PON
+        Formato C300: gpon-onu_1/2/1:1    ZTE-F600    sn      SN:DACMED71A961    ready
         """
         onus = []
         seen = set()
         for line in output.split('\n'):
             line = line.strip()
-            # Formato com prefixo gpon_onu-
+            # Formato com prefixo gpon-onu_ (C300/C320) ou gpon_onu- (legado)
             m = re.match(
-                r'^gpon_onu-(\d+/\d+(?:/\d+)?:\d+)\s+(\S+)\s+\S+\s+(\S+)',
+                r'^gpon[_-]onu[_-](\d+/\d+(?:/\d+)?:\d+)\s+(\S+)\s+\S+\s+(\S+)',
                 line
             )
             if m:
@@ -638,17 +639,14 @@ class ZTEC300Driver(OLTDriver):
 
     def parse_olt_rx(self, output: str) -> Dict[str, float]:
         """
-        Parseia: show pon power olt-rx gpon_olt-SLOT/CARD/PON
-        Formato C300: gpon_onu-1/1/1:1    -27.786(dbm)
+        Parseia: show pon power olt-rx gpon-olt_SLOT/CARD/PON
+        Formato C300: gpon-onu_1/2/1:1    -27.786(dbm)
         """
         rx_map = {}
         for line in output.split('\n'):
             line = line.strip()
-            # Formato C300: gpon_onu-
-            m = re.match(r'gpon_onu-(\d+/\d+(?:/\d+)?:\d+)\s+([-\d\.]+)', line)
-            if not m:
-                # Fallback C320: gpon-onu_
-                m = re.match(r'gpon-onu_(\d+/\d+(?:/\d+)?:\d+)\s+([-\d\.]+)', line)
+            # Aceita ambos os formatos: gpon-onu_ e gpon_onu- (legado)
+            m = re.match(r'gpon[_-]onu[_-](\d+/\d+(?:/\d+)?:\d+)\s+([-\d\.]+)', line)
             if m:
                 idx = m.group(1)
                 try:
@@ -679,7 +677,7 @@ class ZTEC300Driver(OLTDriver):
         O C300/C610 não suporta 'show interface gpon_olt' sem especificar a interface.
         Extrai as portas únicas a partir dos índices de ONU (SLOT/CARD/PON:ID).
 
-        Também aceita output de 'show interface gpon_olt-X/X/X' com múltiplas interfaces.
+        Também aceita output de 'show interface gpon-olt_X/X/X' com múltiplas interfaces.
         """
         ports = []
         seen = set()
@@ -699,8 +697,8 @@ class ZTEC300Driver(OLTDriver):
                     ports.append({"slot": slot, "card": card, "pon": pon, "port_type": "gpon"})
                 continue
 
-            # Formato explícito: gpon_olt-SLOT/CARD/PON
-            m3 = re.search(r'gpon_olt-(\d+)/(\d+)/(\d+)', line)
+            # Formato explícito: gpon-olt_SLOT/CARD/PON ou gpon_olt-SLOT/CARD/PON (legado)
+            m3 = re.search(r'gpon[_-]olt[_-](\d+)/(\d+)/(\d+)', line)
             if m3:
                 slot = int(m3.group(1))
                 card = int(m3.group(2))
