@@ -361,6 +361,27 @@ class OLTTelnetClient:
         except OLTConnectionError:
             raise
         except Exception as e:
+            try:
+                if self.tn:
+                    self.tn.close()
+            except Exception:
+                pass
+            transient_errors = (
+                ConnectionResetError,
+                ConnectionAbortedError,
+                BrokenPipeError,
+                EOFError,
+                socket.timeout,
+                OSError,
+            )
+            if isinstance(e, transient_errors) and not getattr(self, "_retrying_connect", False):
+                _log("warning", f"[TELNET] Conexao resetada durante login em {self.ip}:{self.port}; tentando novamente em 2s")
+                self._retrying_connect = True
+                time.sleep(2)
+                try:
+                    return self.connect()
+                finally:
+                    self._retrying_connect = False
             raise OLTConnectionError(f"Falha Telnet em {self.ip}:{self.port} — {e}")
 
     def execute_command(self, command: str, timeout: int = None) -> str:

@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from .config import settings
@@ -23,4 +24,8 @@ def get_db():
 def init_db():
     """Inicializa o banco de dados e cria as tabelas."""
     from . import models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except OperationalError as exc:
+        if "already exists" not in str(exc).lower():
+            raise

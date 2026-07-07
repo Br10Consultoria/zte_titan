@@ -17,7 +17,8 @@ class Settings:
     REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
     
-    CACHE_TTL: int = int(os.getenv("CACHE_TTL", "86400"))  # 24 horas em segundos
+    CACHE_TTL: int = int(os.getenv("CACHE_TTL", "3600"))  # 1 hora em segundos
+    AUTO_REFRESH_INTERVAL: int = int(os.getenv("AUTO_REFRESH_INTERVAL", "3600"))
     
     SSH_TIMEOUT: int = int(os.getenv("SSH_TIMEOUT", "30"))
     SSH_COMMAND_TIMEOUT: int = int(os.getenv("SSH_COMMAND_TIMEOUT", "60"))

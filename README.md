@@ -17,7 +17,7 @@ Sistema web profissional para gerenciamento e monitoramento de ONUs em OLTs **ZT
 | **Detalhes da ONU** | Serial, firmware, temperatura, WAN, VoIP, distância |
 | **ONUs Não Provisionadas** | Lista ONUs aguardando autorização |
 | **Busca por Serial** | Localiza ONU em todas as portas PON |
-| **Cache Redis 24h** | Resultados armazenados por 24 horas, com opção de forçar atualização |
+| **Cache Redis 1h** | Resultados armazenados por 1 hora, com opção de forçar atualização |
 | **Impressão** | Exporta tabela de ONUs para impressão diretamente no navegador |
 | **Interface moderna** | Tema escuro profissional, fontes máx. 12px, responsivo |
 
@@ -142,7 +142,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 1. Acesse **ONUs**
 2. Selecione a OLT e a porta PON desejada
 3. Clique em **Consultar**
-4. Os dados ficam em cache por 24 horas. Use **Atualizar** para forçar nova consulta
+4. Os dados ficam em cache por 1 hora. Use **Atualizar** para forçar nova consulta
 
 ### 3. Ver Detalhes de uma ONU
 

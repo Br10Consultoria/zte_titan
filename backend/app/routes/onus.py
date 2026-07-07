@@ -4,7 +4,6 @@ Suporta múltiplos modelos via olt_driver.py:
   zte_c320 — ZTE C320/C600/C610/C620/C650 (gpon-olt_1/CARD/PON)
   zte_c300 — ZTE C300/C300M/C300T Titan   (gpon_olt-SLOT/CARD/PON)
 """
-import re
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -31,6 +30,7 @@ from ..olt_client import (
 )
 from ..olt_driver import get_driver
 from ..redis_client import cache
+from ..olt_status_cache import collect_pon_status, pon_status_cache_key
 
 router = APIRouter(prefix="/onus", tags=["ONUs"])
 logger = logging.getLogger("routes.onus")
@@ -65,13 +65,13 @@ def get_pon_status(
     """
     Retorna o status de todas as ONUs de uma porta PON.
     Usa o driver correto para o modelo da OLT cadastrada.
-    Cache Redis por 24 horas. Use force_refresh=true para atualizar.
+    Cache Redis por 1 hora. Use force_refresh=true para atualizar.
     """
     olt = _get_olt_or_404(olt_id, db)
     port_obj = _get_port(olt_id, slot, card, pon, db)
     driver = get_driver(olt.olt_model)
 
-    cache_key = f"olt:{olt_id}:pon:{slot}:{card}:{pon}:status"
+    cache_key = pon_status_cache_key(olt_id, slot, card, pon)
 
     if not force_refresh:
         cached_data = cache.get(cache_key)
@@ -84,109 +84,20 @@ def get_pon_status(
     iface = driver.olt_iface(slot, card, pon)
     logger.info(f"[PON_STATUS] Consultando {iface} na OLT {olt.ip} (modelo: {olt.olt_model})")
 
+    client = None
     try:
         client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
         client.connect()
 
-        # Estado das ONUs
-        cmd_state = driver.cmd_onu_state(iface)
-        logger.info(f"[PON_STATUS] Executando: {cmd_state}")
-        output = client.execute_command(cmd_state, timeout=30)
-        logger.info(f"[PON_STATUS] Output bruto ({len(output)} chars): {output[:500]}")
-        onus = driver.parse_onu_state(output)
-        logger.info(f"[PON_STATUS] {len(onus)} ONUs parseadas")
+        if not port_obj:
+            port_obj = OLTPort(olt_id=olt_id, slot=slot, card=card, pon=pon)
 
-        # Baseinfo (serial + modelo)
-        cmd_base = driver.cmd_onu_baseinfo(iface)
-        logger.info(f"[PON_STATUS] Executando: {cmd_base}")
-        base_out = client.execute_command(cmd_base, timeout=30)
-        base_list = driver.parse_onu_baseinfo(base_out)
-        base_map = {b["onu_index"]: b for b in base_list}
-
-        # RX OLT em batch
-        rx_map = {}
-        try:
-            cmd_rx = driver.cmd_olt_rx(iface)
-            logger.info(f"[PON_STATUS] Executando: {cmd_rx}")
-            rx_out = client.execute_command(cmd_rx, timeout=30)
-            rx_map = driver.parse_olt_rx(rx_out)
-            logger.info(f"[PON_STATUS] RX coletado para {len(rx_map)} ONUs")
-        except Exception as rx_err:
-            logger.warning(f"[PON_STATUS] Falha ao coletar RX OLT: {rx_err}")
-
-        # Detail-info individual por ONU (description + online_duration)
-        detail_map = {}
-        MAX_DETAIL = 60
-        onus_for_detail = onus[:MAX_DETAIL]
-        logger.info(f"[PON_STATUS] Coletando detail-info para {len(onus_for_detail)} ONUs")
-        for onu_item in onus_for_detail:
-            idx = onu_item["onu_index"]  # ex: 1/1/12:1
-            onu_iface = driver.onu_iface(idx)  # ex: gpon-onu_1/1/12:1 ou gpon_onu-1/1/12:1
-            try:
-                cmd_detail = driver.cmd_onu_detail(onu_iface)
-                det_out = client.execute_command(cmd_detail, timeout=10)
-                desc = ""
-                m_desc = re.search(r'Description\s*:\s*(\S[^\n]*)', det_out)
-                if m_desc:
-                    desc = m_desc.group(1).strip()
-                uptime = ""
-                m_up = re.search(r'Online Duration\s*:\s*(\S[^\n]*)', det_out)
-                if m_up:
-                    uptime = m_up.group(1).strip()
-                detail_map[idx] = {"description": desc, "online_duration": uptime}
-            except Exception as det_err:
-                logger.warning(f"[PON_STATUS] Falha detail-info {onu_iface}: {det_err}")
-                detail_map[idx] = {"description": "", "online_duration": ""}
-        logger.info(f"[PON_STATUS] Detail-info coletado para {len(detail_map)} ONUs")
-
-        client.disconnect()
-
-        # Mescla baseinfo + RX + detail com estado
-        for onu in onus:
-            idx = onu["onu_index"]
-            base   = base_map.get(idx, {})
-            detail = detail_map.get(idx, {})
-            onu["serial"]          = base.get("serial", "")
-            onu["model"]           = base.get("model", "")
-            onu["description"]     = detail.get("description", "")
-            onu["online_duration"] = detail.get("online_duration", "")
-            rx_val = rx_map.get(idx)
-            if rx_val is not None:
-                onu["olt_rx_power"] = rx_val
-                if rx_val >= -25:
-                    onu["olt_rx_status"] = "normal"
-                elif rx_val >= -28:
-                    onu["olt_rx_status"] = "warning"
-                else:
-                    onu["olt_rx_status"] = "critical"
-            else:
-                onu["olt_rx_power"] = None
-                onu["olt_rx_status"] = None
-
+        result = collect_pon_status(client, driver, olt, port_obj, include_details=True)
         # Atualiza contagem na porta
         if port_obj:
-            port_obj.onu_count = len(onus)
-            port_obj.status = "online" if any(o["oper_state"] == "working" for o in onus) else "active"
+            port_obj.onu_count = result["total"]
+            port_obj.status = "online" if result["online"] > 0 else "active"
             db.commit()
-
-        online  = sum(1 for o in onus if o["oper_state"] == "working")
-        offline = sum(1 for o in onus if o["oper_state"] not in ("working", "initial", "ranging"))
-
-        result = {
-            "olt_id":        olt_id,
-            "slot":          slot,
-            "card":          card,
-            "pon":           pon,
-            "olt_interface": iface,
-            "olt_model":     olt.olt_model,
-            "onus":          onus,
-            "total":         len(onus),
-            "online":        online,
-            "offline":       offline,
-            "cached":        False,
-            "cache_expires_in": None,
-            "last_updated":  _now_iso()
-        }
 
         cache.set(cache_key, result)
         return result
@@ -197,6 +108,12 @@ def get_pon_status(
     except Exception as e:
         logger.error(f"[PON_STATUS] Erro inesperado: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+    finally:
+        if client:
+            try:
+                client.disconnect()
+            except Exception:
+                pass
 
 
 @router.get("/{olt_id}/pon/{slot}/{card}/{pon}/onu/{onu_id}/full")

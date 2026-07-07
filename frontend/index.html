@@ -1033,7 +1033,10 @@
                   Portas PON — <strong x-text="selectedOLTForPorts ? selectedOLTForPorts.name : ''"></strong>
                   <span style="color:var(--text-muted);font-weight:400" x-text="' (' + (selectedOLTPorts ? selectedOLTPorts.length : 0) + ' portas)'"></span>
                 </span>
-                <button @click="selectedOLTPorts=null" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <button @click="refreshOLTStatus(selectedOLTForPorts)" class="btn btn-warning btn-xs" :disabled="!selectedOLTForPorts" title="Atualizar status"><i class="fas fa-rotate-right"></i></button>
+                  <button @click="selectedOLTPorts=null" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+                </div>
               </div>
               <div class="table-wrap">
                 <table>

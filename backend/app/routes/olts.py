@@ -22,6 +22,7 @@ from ..snmp_client import (
     snmp_discover_pon_ports, snmp_get_system_info, snmp_test_connection, SNMPError
 )
 from ..redis_client import cache
+from ..olt_status_cache import refresh_olt_ports_status
 
 
 router = APIRouter(prefix="/olts", tags=["OLTs"])
@@ -395,43 +396,12 @@ def _update_ports_onu_count(olt_id: int, ip: str, port: int,
     Tarefa em background: conecta na OLT e atualiza contagem de ONUs por porta.
     Usa o driver correto para o modelo da OLT.
     """
-    from ..database import SessionLocal
-    from ..olt_client import get_olt_client, OLTConnectionError
-    from ..olt_driver import get_driver
-
-    driver = get_driver(olt_model)
-    logger.info(f"[BG] Atualizando contagem de ONUs para OLT {olt_id} (modelo: {olt_model})")
-    db = SessionLocal()
-    try:
-        ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).all()
-        if not ports:
-            logger.warning(f"[BG] Nenhuma porta para OLT {olt_id}")
-            return
-
-        client = get_olt_client(ip, port, username, password, protocol)
-        client.connect()
-
-        for p in ports:
-            iface = driver.olt_iface(p.slot, p.card, p.pon)
-            try:
-                logger.info(f"[BG] Consultando {iface}")
-                out = client.execute_command(driver.cmd_onu_state(iface), timeout=15)
-                onus = driver.parse_onu_state(out)
-                p.onu_count = len(onus)
-                p.status = "online" if onus else ("active" if out.strip() else "unknown")
-                logger.info(f"[BG] {iface}: {len(onus)} ONUs, status={p.status}")
-            except Exception as ex:
-                logger.error(f"[BG] Erro em {iface}: {ex}")
-                p.status = "unknown"
-
-        client.disconnect()
-        db.commit()
-        logger.info(f"[BG] Contagem atualizada para OLT {olt_id}")
-
-    except Exception as e:
-        logger.error(f"[BG] Erro ao atualizar OLT {olt_id}: {e}", exc_info=True)
-    finally:
-        db.close()
+    logger.info(f"[BG] Atualizando cache Redis de ONUs para OLT {olt_id} (modelo: {olt_model})")
+    result = refresh_olt_ports_status(olt_id, include_details=False)
+    if result.get("errors"):
+        logger.warning(f"[BG] Atualizacao da OLT {olt_id} finalizada com erros: {result}")
+    else:
+        logger.info(f"[BG] Atualizacao da OLT {olt_id} concluida: {result}")
 
 
 # ============================================================
@@ -452,6 +422,28 @@ def get_olt_ports(
         OLTPort.slot, OLTPort.card, OLTPort.pon
     ).all()
     return ports
+
+
+@router.post("/{olt_id}/refresh-status")
+def refresh_olt_status_cache(
+    olt_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Atualiza em background o cache Redis de status/ONUs de todas as portas da OLT."""
+    olt = db.query(OLT).filter(OLT.id == olt_id).first()
+    if not olt:
+        raise HTTPException(status_code=404, detail="OLT nÃ£o encontrada")
+
+    background_tasks.add_task(
+        _update_ports_onu_count,
+        olt_id, olt.ip, olt.port, olt.username, olt.password, olt.protocol, olt.olt_model
+    )
+    return {
+        "message": "Atualizacao de status iniciada em background",
+        "olt_id": olt_id,
+    }
 
 
 @router.get("/{olt_id}/status")

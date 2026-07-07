@@ -10,6 +10,7 @@ import hmac
 import os
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .config import settings
 from .database import get_db
@@ -158,6 +159,8 @@ def verify_totp(secret: str, code: str) -> bool:
 def create_default_admin(db: Session):
     """Cria o usuário admin padrão se não existir."""
     admin = db.query(User).filter(User.username == "admin").first()
+    if admin:
+        return admin
     if not admin:
         admin = User(
             username="admin",
@@ -169,7 +172,12 @@ def create_default_admin(db: Session):
             is_2fa_enabled=False,
         )
         db.add(admin)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            admin = db.query(User).filter(User.username == "admin").first()
+            return admin
         db.refresh(admin)
         print("✅ Usuário admin criado: admin / Admin2024")
     return admin

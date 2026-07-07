@@ -164,7 +164,7 @@ User=root
 WorkingDirectory=${APP_DIR}/backend
 Environment=PATH=${VENV_DIR}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EnvironmentFile=${APP_DIR}/.env
-ExecStart=${VENV_DIR}/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+ExecStart=${VENV_DIR}/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 Restart=always
 RestartSec=5
 StandardOutput=journal

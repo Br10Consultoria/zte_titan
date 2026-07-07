@@ -385,6 +385,21 @@ function app() {
       }
     },
 
+    async refreshOLTStatus(olt) {
+      this.showToast(`Atualizando status de ${olt.name} em background...`, 'info');
+      try {
+        const res = await this.apiPost(`/olts/${olt.id}/refresh-status`, {});
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro ao atualizar status');
+        this.showToast(data.message || 'Atualizacao iniciada!', 'success');
+        setTimeout(() => {
+          if (this.selectedOLTForPorts && this.selectedOLTForPorts.id === olt.id) this.loadOLTPorts(olt);
+        }, 5000);
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
     async loadOLTPorts(olt) {
       this.selectedOLTForPorts = olt;
       try {

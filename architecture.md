@@ -6,7 +6,7 @@ Este documento descreve a arquitetura e a estrutura do sistema web para gerencia
 
 - **Backend**: Python 3.11 com **FastAPI** (rápido, assíncrono, documentação automática).
 - **Banco de Dados**: **SQLite** (armazenamento local simples, sem necessidade de servidor de BD dedicado).
-- **Cache**: **Redis** (cache de 24 horas para os resultados das consultas).
+- **Cache**: **Redis** (cache de 1 hora para os resultados das consultas).
 - **Autenticação**: JWT (JSON Web Tokens) + **2FA TOTP** (Google Authenticator / Authy) com QR Code.
 - **Frontend**: HTML5, **Tailwind CSS** (estilizado para fontes de no máximo 12px, tema escuro/profissional), **Alpine.js** (reatividade simples sem necessidade de build complexo).
 - **Integração OLT**: SSH (via `paramiko`) e SNMP (via `pysnmp` ou consultas diretas).
@@ -81,5 +81,5 @@ zte_titan/
 ## Mecanismo de Cache (Redis)
 - Toda consulta de status de ONUs por porta PON (`show gpon onu state`) ou detalhada (`show gpon onu detail-info`, `show pon power attenuation`) será armazenada no Redis.
 - Chave do Redis: `olt:{olt_id}:pon:{slot}:{port}:onus` ou `olt:{olt_id}:onu:{slot}:{port}:{onu_id}:detail`
-- Tempo de expiração (TTL): 86400 segundos (24 horas).
+- Tempo de expiração (TTL): 3600 segundos (1 hora).
 - Possibilidade de "Forçar Atualização" no frontend para limpar o cache e consultar diretamente na OLT.

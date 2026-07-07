@@ -80,6 +80,7 @@ _LOG_FILE = _setup_logging()
 from .database import init_db, SessionLocal
 from .auth import create_default_admin
 from .routes import auth, olts, onus
+from .olt_status_cache import start_hourly_status_refresh
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -167,6 +168,7 @@ def startup_event():
         create_default_admin(db)
     finally:
         db.close()
+    start_hourly_status_refresh()
     print("✅ Sistema iniciado com sucesso!")
     print(f"📖 Documentação API: http://localhost:8000/api/docs")
 

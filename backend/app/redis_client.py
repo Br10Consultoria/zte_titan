@@ -116,21 +116,21 @@ class RedisCache:
     # ============================================================
 
     @staticmethod
-    def key_pon_status(olt_id: int, slot: int, pon: int, _unused: int = 1) -> str:
-        """Chave: olt:ID:pon:SLOT:PON:status"""
-        return f"olt:{olt_id}:pon:{slot}:{pon}:status"
+    def key_pon_status(olt_id: int, slot: int, card: int, pon: int) -> str:
+        """Chave: olt:ID:pon:SLOT:CARD:PON:status"""
+        return f"olt:{olt_id}:pon:{slot}:{card}:{pon}:status"
 
     @staticmethod
-    def key_onu_detail(olt_id: int, slot: int, pon: int, onu_id: int, _unused: int = 1) -> str:
-        return f"olt:{olt_id}:onu:{slot}:{pon}:{onu_id}:detail"
+    def key_onu_detail(olt_id: int, slot: int, card: int, pon: int, onu_id: int) -> str:
+        return f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:detail"
 
     @staticmethod
-    def key_onu_power(olt_id: int, slot: int, pon: int, onu_id: int, _unused: int = 1) -> str:
-        return f"olt:{olt_id}:onu:{slot}:{pon}:{onu_id}:power"
+    def key_onu_power(olt_id: int, slot: int, card: int, pon: int, onu_id: int) -> str:
+        return f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:power"
 
     @staticmethod
-    def key_onu_full(olt_id: int, slot: int, pon: int, onu_id: int, _unused: int = 1) -> str:
-        return f"olt:{olt_id}:onu:{slot}:{pon}:{onu_id}:full"
+    def key_onu_full(olt_id: int, slot: int, card: int, pon: int, onu_id: int) -> str:
+        return f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:full"
 
     @staticmethod
     def key_olt_ports(olt_id: int) -> str:
