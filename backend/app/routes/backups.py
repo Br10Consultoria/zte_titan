@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_admin, get_current_user
 from ..backup_service import (
     ensure_ftp_server,
+    ftp_status,
     get_or_create_settings,
     run_backup_job,
     test_telegram,
@@ -59,6 +60,14 @@ def test_backup_telegram(
         return test_telegram(db)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/ftp-status")
+def get_backup_ftp_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return ftp_status(db)
 
 
 @router.post("/run", response_model=BackupJobResponse)

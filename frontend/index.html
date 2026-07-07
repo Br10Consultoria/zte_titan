@@ -1442,6 +1442,34 @@
               </div>
             </div>
 
+            <div class="card card-body mb-4" x-show="backupFtpStatus">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                <div>
+                  <div class="form-label">FTP interno do container</div>
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <span :class="backupFtpStatus && backupFtpStatus.running ? 'badge badge-green' : 'badge badge-red'" x-text="backupFtpStatus && backupFtpStatus.running ? 'rodando' : 'parado'"></span>
+                    <span class="td-mono" x-text="`${backupFtpStatus?.bind || '0.0.0.0'}:${backupFtpStatus?.port || 21}`"></span>
+                    <span class="td-mono" x-text="`IP anunciado: ${backupFtpStatus?.server_ip || '-'}`"></span>
+                    <span class="td-mono" x-text="`passivas: ${backupFtpStatus?.passive_ports || '-'}`"></span>
+                  </div>
+                  <div class="td-mono" style="margin-top:8px;color:var(--text-secondary);font-size:12px" x-text="backupFtpStatus?.ftp_dir || ''"></div>
+                </div>
+                <button @click="loadBackupFtpStatus()" class="btn btn-ghost btn-xs"><i class="fas fa-rotate-right"></i></button>
+              </div>
+              <div style="margin-top:12px" x-show="backupFtpStatus && backupFtpStatus.files && backupFtpStatus.files.length">
+                <div class="form-label">Ultimos arquivos recebidos</div>
+                <div style="display:grid;gap:6px">
+                  <template x-for="file in backupFtpStatus.files" :key="file.name">
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px">
+                      <span class="td-mono" x-text="file.name"></span>
+                      <span x-text="formatBytes(file.size)"></span>
+                      <span style="color:var(--text-secondary)" x-text="file.mtime"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
             <div class="card card-body mb-4">
               <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
                 <div>

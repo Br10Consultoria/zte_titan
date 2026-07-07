@@ -86,6 +86,7 @@ function app() {
     },
     backupOltId: '',
     backupJobs: [],
+    backupFtpStatus: null,
     backupLoading: false,
 
     // Users
@@ -776,6 +777,7 @@ function app() {
     async loadBackupPage() {
       await this.loadOLTs();
       await this.loadBackupSettings();
+      await this.loadBackupFtpStatus();
       await this.loadBackupJobs();
       if (!this.backupOltId && this.olts.length) this.backupOltId = String(this.olts[0].id);
     },
@@ -799,6 +801,7 @@ function app() {
         const data = await this.safeJson(res);
         if (!res.ok) throw new Error(data.detail || 'Erro ao salvar backup');
         this.backupSettings = { ...this.backupSettings, ...data };
+        await this.loadBackupFtpStatus();
         this.showToast('Configurações de backup salvas!', 'success');
       } catch (e) {
         this.showToast(e.message, 'error');
@@ -829,8 +832,12 @@ function app() {
         const data = await this.safeJson(res);
         if (!res.ok) throw new Error(data.detail || 'Erro ao iniciar backup');
         this.showToast(`Backup iniciado (job #${data.id})`, 'success');
+        await this.loadBackupFtpStatus();
         await this.loadBackupJobs();
-        setTimeout(() => this.loadBackupJobs(), 5000);
+        setTimeout(() => {
+          this.loadBackupFtpStatus();
+          this.loadBackupJobs();
+        }, 5000);
       } catch (e) {
         this.showToast(e.message, 'error');
       } finally {
@@ -842,6 +849,13 @@ function app() {
       try {
         const res = await this.apiGet('/backups/jobs');
         if (res.ok) this.backupJobs = await this.safeJson(res);
+      } catch (e) {}
+    },
+
+    async loadBackupFtpStatus() {
+      try {
+        const res = await this.apiGet('/backups/ftp-status');
+        if (res.ok) this.backupFtpStatus = await this.safeJson(res);
       } catch (e) {}
     },
 

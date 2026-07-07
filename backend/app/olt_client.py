@@ -45,6 +45,11 @@ def _log(level: str, msg: str):
     getattr(logger, level)(msg)
 
 
+def _redact_command(command: str) -> str:
+    """Remove senhas de comandos logados, mantendo o comando real intacto."""
+    return re.sub(r"(@[^:\s]+:)[^\s]+", r"\1***", command)
+
+
 # ============================================================
 # Wrapper Telnet: usa telnetlib nativo (Python 3.11) ou socket puro (3.13+)
 # ============================================================
@@ -230,7 +235,7 @@ class OLTSSHClient:
             raise OLTConnectionError("Shell SSH não disponível")
 
         timeout = timeout or settings.SSH_COMMAND_TIMEOUT
-        _log("info", f"[SSH] Executando: {command}")
+        _log("info", f"[SSH] Executando: {_redact_command(command)}")
         self.shell.send(command + "\n")
         time.sleep(0.5)
 
@@ -428,7 +433,7 @@ class OLTTelnetClient:
 
     def execute_command(self, command: str, timeout: int = None) -> str:
         timeout = timeout or settings.SSH_COMMAND_TIMEOUT
-        _log("info", f"[TELNET] Executando: {command}")
+        _log("info", f"[TELNET] Executando: {_redact_command(command)}")
         self.tn.write(command.encode("ascii") + b"\n")
 
         output = ""

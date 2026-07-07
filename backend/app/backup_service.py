@@ -30,6 +30,30 @@ _ftp_server: Optional[FTPServer] = None
 _ftp_signature = None
 
 
+class LoggingFTPHandler(FTPHandler):
+    def on_connect(self):
+        logger.info(f"[FTP] Conexao de {self.remote_ip}:{self.remote_port}")
+
+    def on_disconnect(self):
+        logger.info(f"[FTP] Desconectado {self.remote_ip}:{self.remote_port}")
+
+    def on_login(self, username):
+        logger.info(f"[FTP] Login OK usuario={username} origem={self.remote_ip}")
+
+    def on_login_failed(self, username, password):
+        logger.warning(f"[FTP] Login falhou usuario={username} origem={self.remote_ip}")
+
+    def on_file_received(self, file):
+        try:
+            size = Path(file).stat().st_size
+        except Exception:
+            size = 0
+        logger.info(f"[FTP] Arquivo recebido: {file} ({size} bytes)")
+
+    def on_incomplete_file_received(self, file):
+        logger.warning(f"[FTP] Arquivo incompleto recebido: {file}")
+
+
 def _ensure_dirs():
     FTP_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -84,7 +108,7 @@ def ensure_ftp_server(settings: BackupSettings) -> bool:
         authorizer = DummyAuthorizer()
         authorizer.add_user(settings.ftp_user, settings.ftp_password, str(FTP_DIR), perm="elradfmwMT")
 
-        handler = FTPHandler
+        handler = LoggingFTPHandler
         handler.authorizer = authorizer
         handler.passive_ports = _parse_passive_ports(settings.ftp_passive_ports)
         if settings.server_ip:
@@ -99,6 +123,29 @@ def ensure_ftp_server(settings: BackupSettings) -> bool:
         _ftp_signature = signature
         logger.info(f"[BACKUP] FTP iniciado em {address[0]}:{address[1]} dir={FTP_DIR}")
         return True
+
+
+def ftp_status(db: Session) -> dict:
+    settings = get_or_create_settings(db)
+    files = []
+    _ensure_dirs()
+    for path in sorted(FTP_DIR.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True):
+        if path.is_file():
+            stat = path.stat()
+            files.append({
+                "name": path.name,
+                "size": stat.st_size,
+                "mtime": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            })
+    return {
+        "running": _ftp_server is not None,
+        "bind": settings.ftp_bind_host,
+        "port": settings.ftp_port,
+        "server_ip": settings.server_ip,
+        "passive_ports": settings.ftp_passive_ports,
+        "ftp_dir": str(FTP_DIR),
+        "files": files[:20],
+    }
 
 
 def sha256sum(path: Path) -> str:
@@ -173,11 +220,16 @@ def run_backup_job(job_id: int, send_telegram_flag: bool = True):
         )
 
         logger.info(f"[BACKUP] Executando backup da OLT {olt.id} {olt.ip}")
+        logger.info(f"[BACKUP] Aguardando arquivo FTP em {ftp_path}")
         client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
         client.connect()
         output = client.execute_command(command, timeout=180)
-        job.command_output = output[-8000:] if output else ""
+        safe_output = output or ""
+        if settings.ftp_password:
+            safe_output = safe_output.replace(settings.ftp_password, "***")
+        job.command_output = safe_output[-8000:] if safe_output else ""
         db.commit()
+        logger.info(f"[BACKUP] Saida do comando copy ftp ({len(safe_output)} chars): {safe_output[-1000:]}")
 
         deadline = time.time() + 120
         while time.time() < deadline:
@@ -185,7 +237,15 @@ def run_backup_job(job_id: int, send_telegram_flag: bool = True):
                 break
             time.sleep(2)
         else:
-            raise RuntimeError("Backup nao chegou no FTP ou arquivo veio vazio")
+            existing = [
+                f"{p.name} ({p.stat().st_size} bytes)"
+                for p in FTP_DIR.glob("*")
+                if p.is_file()
+            ]
+            raise RuntimeError(
+                "Backup nao chegou no FTP ou arquivo veio vazio. "
+                f"Esperado: {ftp_filename}. Arquivos no FTP: {existing or 'nenhum'}"
+            )
 
         shutil.copy2(ftp_path, final_dat)
         file_hash = sha256sum(final_dat)

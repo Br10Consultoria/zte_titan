@@ -222,6 +222,7 @@ class BackupJobResponse(BaseModel):
     sha256: Optional[str] = None
     telegram_sent: bool = False
     message: Optional[str] = None
+    command_output: Optional[str] = None
 
     class Config:
         from_attributes = True
