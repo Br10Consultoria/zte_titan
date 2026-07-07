@@ -58,7 +58,7 @@ def _setup_logging():
     console_handler.setLevel(logging.INFO)
 
     # Configura loggers do sistema
-    for name in ["olt_client", "snmp_client", "routes.olts", "routes.onus", "routes.auth"]:
+    for name in ["olt_client", "snmp_client", "routes.olts", "routes.onus", "routes.auth", "routes.backups"]:
         lg = logging.getLogger(name)
         lg.setLevel(logging.DEBUG)
         if not lg.handlers:
@@ -79,8 +79,9 @@ def _setup_logging():
 _LOG_FILE = _setup_logging()
 from .database import init_db, SessionLocal
 from .auth import create_default_admin
-from .routes import auth, olts, onus
+from .routes import auth, olts, onus, backups
 from .olt_status_cache import start_hourly_status_refresh
+from .backup_service import ensure_ftp_server, get_or_create_settings
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -114,6 +115,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router, prefix="/api")
 app.include_router(olts.router, prefix="/api")
 app.include_router(onus.router, prefix="/api")
+app.include_router(backups.router, prefix="/api")
 
 
 @app.get("/api/logs")
@@ -166,6 +168,14 @@ def startup_event():
     db = SessionLocal()
     try:
         create_default_admin(db)
+    finally:
+        db.close()
+    db = SessionLocal()
+    try:
+        backup_settings = get_or_create_settings(db)
+        ensure_ftp_server(backup_settings)
+    except Exception as e:
+        logging.getLogger("routes.backups").warning(f"[BACKUP] FTP nao iniciado no startup: {e}")
     finally:
         db.close()
     start_hourly_status_refresh()

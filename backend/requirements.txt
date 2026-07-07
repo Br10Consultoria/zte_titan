@@ -11,6 +11,7 @@ redis
 paramiko
 aiofiles
 httpx
+pyftpdlib
 python-dotenv
 Pillow
 pytz

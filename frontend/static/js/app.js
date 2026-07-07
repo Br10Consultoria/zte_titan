@@ -70,6 +70,24 @@ function app() {
     searchResults: null,
     searchLoading: false,
 
+    // Backups
+    backupSettings: {
+      server_ip: '',
+      ftp_bind_host: '0.0.0.0',
+      ftp_port: 21,
+      ftp_passive_ports: '30000-30009',
+      ftp_user: 'ztebackup',
+      ftp_password: '',
+      source_path: '/datadisk0/DATA0/startrun.dat',
+      telegram_bot_token: '',
+      telegram_chat_id: '',
+      telegram_enabled: true,
+      keep_local: true,
+    },
+    backupOltId: '',
+    backupJobs: [],
+    backupLoading: false,
+
     // Users
     users: [],
     userModal: false,
@@ -300,6 +318,7 @@ function app() {
     setPage(p) {
       this.page = p;
       if (p === 'users') this.loadUsers();
+      if (p === 'backups') this.loadBackupPage();
     },
 
     // ============================================================
@@ -748,6 +767,104 @@ function app() {
         this.showToast(e.message, 'error');
       } finally {
         this.searchLoading = false;
+      }
+    },
+
+    // ============================================================
+    // BACKUPS
+    // ============================================================
+    async loadBackupPage() {
+      await this.loadOLTs();
+      await this.loadBackupSettings();
+      await this.loadBackupJobs();
+      if (!this.backupOltId && this.olts.length) this.backupOltId = String(this.olts[0].id);
+    },
+
+    async loadBackupSettings() {
+      try {
+        const res = await this.apiGet('/backups/settings');
+        if (res.ok) {
+          const data = await this.safeJson(res);
+          this.backupSettings = { ...this.backupSettings, ...data };
+        }
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async saveBackupSettings() {
+      this.backupLoading = true;
+      try {
+        const res = await this.apiPut('/backups/settings', this.backupSettings);
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro ao salvar backup');
+        this.backupSettings = { ...this.backupSettings, ...data };
+        this.showToast('Configurações de backup salvas!', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      } finally {
+        this.backupLoading = false;
+      }
+    },
+
+    async testBackupTelegram() {
+      this.backupLoading = true;
+      try {
+        const res = await this.apiPost('/backups/test-telegram', {});
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro no Telegram');
+        this.showToast('Mensagem de teste enviada!', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      } finally {
+        this.backupLoading = false;
+      }
+    },
+
+    async runBackup() {
+      if (!this.backupOltId) return;
+      this.backupLoading = true;
+      try {
+        const res = await this.apiPost('/backups/run', { olt_id: Number(this.backupOltId), send_telegram: true });
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro ao iniciar backup');
+        this.showToast(`Backup iniciado (job #${data.id})`, 'success');
+        await this.loadBackupJobs();
+        setTimeout(() => this.loadBackupJobs(), 5000);
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      } finally {
+        this.backupLoading = false;
+      }
+    },
+
+    async loadBackupJobs() {
+      try {
+        const res = await this.apiGet('/backups/jobs');
+        if (res.ok) this.backupJobs = await this.safeJson(res);
+      } catch (e) {}
+    },
+
+    async downloadBackup(job) {
+      try {
+        const res = await fetch(`${API_BASE}/backups/jobs/${job.id}/download`, {
+          headers: { 'Authorization': `Bearer ${this.getToken()}` }
+        });
+        if (!res.ok) {
+          const err = await this.safeJson(res);
+          throw new Error(err.detail || 'Erro ao baixar backup');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = job.filename || `backup-${job.id}.gz`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        this.showToast(e.message, 'error');
       }
     },
 

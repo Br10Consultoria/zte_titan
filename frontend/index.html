@@ -787,6 +787,11 @@
         <div @click="setPage('search')" :class="{'active': page==='search'}" class="nav-item" title="Buscar ONU">
           <i class="fas fa-magnifying-glass"></i><span class="nav-label">Buscar ONU</span>
         </div>
+        <template x-if="currentUser && currentUser.role === 'admin'">
+          <div @click="setPage('backups')" :class="{'active': page==='backups'}" class="nav-item" title="Backups">
+            <i class="fas fa-cloud-arrow-up"></i><span class="nav-label">Backups</span>
+          </div>
+        </template>
 
         <div class="nav-section">Sistema</div>
         <template x-if="currentUser && currentUser.role === 'admin'">
@@ -882,8 +887,8 @@
           <i class="fas fa-bars"></i>
         </button>
         <div class="topbar-title">
-          <i :class="page==='dashboard'?'fas fa-gauge-high':page==='olts'?'fas fa-server':page==='onus'?'fas fa-router':page==='uncfg'?'fas fa-circle-exclamation':page==='search'?'fas fa-magnifying-glass':page==='users'?'fas fa-users':'fas fa-user-gear'"></i>
-          <span x-text="page==='dashboard'?'Dashboard':page==='olts'?'Gerenciamento de OLTs':page==='onus'?'Status das ONUs':page==='uncfg'?'ONUs Não Provisionadas':page==='search'?'Buscar ONU por Serial':page==='users'?'Gerenciamento de Usuários':'Meu Perfil'"></span>
+          <i :class="page==='dashboard'?'fas fa-gauge-high':page==='olts'?'fas fa-server':page==='onus'?'fas fa-router':page==='uncfg'?'fas fa-circle-exclamation':page==='search'?'fas fa-magnifying-glass':page==='backups'?'fas fa-cloud-arrow-up':page==='users'?'fas fa-users':'fas fa-user-gear'"></i>
+          <span x-text="page==='dashboard'?'Dashboard':page==='olts'?'Gerenciamento de OLTs':page==='onus'?'Status das ONUs':page==='uncfg'?'ONUs Não Provisionadas':page==='search'?'Buscar ONU por Serial':page==='backups'?'Backups de OLT':page==='users'?'Gerenciamento de Usuários':'Meu Perfil'"></span>
         </div>
         <div class="topbar-actions">
           <span style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px">
@@ -1373,6 +1378,114 @@
                     </template>
                     <tr x-show="!searchResults || searchResults.length === 0">
                       <td colspan="8"><div class="empty-state" style="padding:28px"><i class="fas fa-magnifying-glass"></i><p>Nenhuma ONU encontrada com esse serial.</p></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BACKUPS -->
+        <div x-show="page === 'backups'">
+          <div class="page-body">
+            <div class="card card-body mb-4">
+              <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+                <div>
+                  <label class="form-label">IP do servidor FTP</label>
+                  <input x-model="backupSettings.server_ip" class="input-field" placeholder="Ex: 187.87.x.x" />
+                </div>
+                <div>
+                  <label class="form-label">Usuário FTP</label>
+                  <input x-model="backupSettings.ftp_user" class="input-field" />
+                </div>
+                <div>
+                  <label class="form-label">Senha FTP</label>
+                  <input x-model="backupSettings.ftp_password" type="password" class="input-field" />
+                </div>
+                <div>
+                  <label class="form-label">Porta FTP</label>
+                  <input x-model.number="backupSettings.ftp_port" type="number" class="input-field" />
+                </div>
+                <div>
+                  <label class="form-label">Portas passivas</label>
+                  <input x-model="backupSettings.ftp_passive_ports" class="input-field" placeholder="30000-30009" />
+                </div>
+                <div style="grid-column:span 2">
+                  <label class="form-label">Arquivo de origem na OLT</label>
+                  <input x-model="backupSettings.source_path" class="input-field" />
+                </div>
+                <div>
+                  <label class="form-label">Bind FTP</label>
+                  <input x-model="backupSettings.ftp_bind_host" class="input-field" />
+                </div>
+                <div style="grid-column:span 2">
+                  <label class="form-label">Telegram Bot Token</label>
+                  <input x-model="backupSettings.telegram_bot_token" type="password" class="input-field" />
+                </div>
+                <div>
+                  <label class="form-label">Telegram Chat ID</label>
+                  <input x-model="backupSettings.telegram_chat_id" class="input-field" />
+                </div>
+                <div style="display:flex;gap:14px;align-items:flex-end;padding-bottom:8px">
+                  <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-secondary)">
+                    <input type="checkbox" x-model="backupSettings.telegram_enabled" /> Telegram
+                  </label>
+                  <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-secondary)">
+                    <input type="checkbox" x-model="backupSettings.keep_local" /> Manter local
+                  </label>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:14px">
+                <button @click="saveBackupSettings()" class="btn btn-primary" :disabled="backupLoading"><i class="fas fa-save"></i> Salvar</button>
+                <button @click="testBackupTelegram()" class="btn btn-ghost" :disabled="backupLoading"><i class="fas fa-paper-plane"></i> Testar Telegram</button>
+              </div>
+            </div>
+
+            <div class="card card-body mb-4">
+              <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+                <div>
+                  <label class="form-label">OLT</label>
+                  <select x-model="backupOltId" class="input-field" style="width:220px">
+                    <option value="">Selecione a OLT</option>
+                    <template x-for="olt in olts" :key="olt.id">
+                      <option :value="olt.id" x-text="olt.name + ' — ' + olt.ip"></option>
+                    </template>
+                  </select>
+                </div>
+                <button @click="runBackup()" class="btn btn-success" :disabled="!backupOltId || backupLoading">
+                  <i class="fas fa-cloud-arrow-up"></i> Executar Backup
+                </button>
+                <button @click="loadBackupJobs()" class="btn btn-ghost"><i class="fas fa-rotate-right"></i></button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <span>Histórico de backups</span>
+                <span class="badge badge-blue" x-text="backupJobs.length"></span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>ID</th><th>OLT</th><th>Status</th><th>Arquivo</th><th>Tamanho</th><th>SHA256</th><th>Telegram</th><th>Mensagem</th><th>Ações</th></tr></thead>
+                  <tbody>
+                    <template x-for="job in backupJobs" :key="job.id">
+                      <tr>
+                        <td class="td-mono" x-text="'#'+job.id"></td>
+                        <td x-text="(olts.find(o => o.id === job.olt_id) || {}).name || job.olt_id"></td>
+                        <td><span :class="job.status==='success'?'badge badge-green':job.status==='failed'?'badge badge-red':'badge badge-yellow'" x-text="job.status"></span></td>
+                        <td class="td-mono" x-text="job.filename || '—'"></td>
+                        <td x-text="job.file_size ? formatBytes(job.file_size) : '—'"></td>
+                        <td class="td-mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis" x-text="job.sha256 || '—'"></td>
+                        <td><span :class="job.telegram_sent?'badge badge-green':'badge badge-gray'" x-text="job.telegram_sent ? 'enviado' : '—'"></span></td>
+                        <td x-text="job.message || '—'"></td>
+                        <td>
+                          <button x-show="job.status==='success'" @click="downloadBackup(job)" class="btn btn-primary btn-xs"><i class="fas fa-download"></i></button>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="backupJobs.length === 0">
+                      <td colspan="9"><div class="empty-state" style="padding:28px"><i class="fas fa-cloud-arrow-up"></i><p>Nenhum backup executado.</p></div></td>
                     </tr>
                   </tbody>
                 </table>

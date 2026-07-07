@@ -76,3 +76,41 @@ class AuditLog(Base):
     details = Column(Text, nullable=True)
     ip_address = Column(String(45), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class BackupSettings(Base):
+    __tablename__ = "backup_settings"
+
+    id = Column(Integer, primary_key=True, default=1)
+    server_ip = Column(String(45), nullable=True)
+    ftp_bind_host = Column(String(45), default="0.0.0.0")
+    ftp_port = Column(Integer, default=21)
+    ftp_passive_ports = Column(String(50), default="30000-30009")
+    ftp_user = Column(String(80), default="ztebackup")
+    ftp_password = Column(String(120), nullable=True)
+    source_path = Column(String(200), default="/datadisk0/DATA0/startrun.dat")
+    telegram_bot_token = Column(String(200), nullable=True)
+    telegram_chat_id = Column(String(80), nullable=True)
+    telegram_enabled = Column(Boolean, default=True)
+    keep_local = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class BackupJob(Base):
+    __tablename__ = "backup_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    olt_id = Column(Integer, ForeignKey("olts.id"), nullable=False)
+    status = Column(String(20), default="running")  # running | success | failed
+    started_at = Column(DateTime, default=datetime.utcnow)
+    finished_at = Column(DateTime, nullable=True)
+    filename = Column(String(255), nullable=True)
+    file_path = Column(String(500), nullable=True)
+    file_size = Column(Integer, nullable=True)
+    sha256 = Column(String(64), nullable=True)
+    telegram_sent = Column(Boolean, default=False)
+    message = Column(Text, nullable=True)
+    command_output = Column(Text, nullable=True)
+
+    olt = relationship("OLT")

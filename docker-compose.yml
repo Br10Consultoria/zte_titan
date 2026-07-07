@@ -23,6 +23,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+      - "21:21"
+      - "30000-30009:30000-30009"
     environment:
       - SECRET_KEY=${SECRET_KEY:-zte-titan-change-this-secret-key-in-production}
       - DATABASE_URL=sqlite:////app/data/zte_titan.db

@@ -178,3 +178,50 @@ class ONUFullInfo(BaseModel):
     firmware: Optional[Dict] = None
     cached: bool
     last_updated: str
+
+
+# ============================================================
+# BACKUP SCHEMAS
+# ============================================================
+
+class BackupSettingsUpdate(BaseModel):
+    server_ip: Optional[str] = None
+    ftp_bind_host: str = "0.0.0.0"
+    ftp_port: int = 21
+    ftp_passive_ports: str = "30000-30009"
+    ftp_user: str = "ztebackup"
+    ftp_password: Optional[str] = None
+    source_path: str = "/datadisk0/DATA0/startrun.dat"
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    telegram_enabled: bool = True
+    keep_local: bool = True
+
+
+class BackupSettingsResponse(BackupSettingsUpdate):
+    id: int
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BackupRunRequest(BaseModel):
+    olt_id: int
+    send_telegram: bool = True
+
+
+class BackupJobResponse(BaseModel):
+    id: int
+    olt_id: int
+    status: str
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    filename: Optional[str] = None
+    file_size: Optional[int] = None
+    sha256: Optional[str] = None
+    telegram_sent: bool = False
+    message: Optional[str] = None
+
+    class Config:
+        from_attributes = True
