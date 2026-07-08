@@ -31,6 +31,48 @@ _ftp_signature = None
 
 
 class LoggingFTPHandler(FTPHandler):
+    def _make_eport(self, ip, port):
+        """Defer active FTP data connection until STOR/RETR is issued.
+
+        Some ZTE OLTs abort uploads if the server connects to the PORT data
+        socket immediately after PORT. The standard flow they expect is:
+        PORT -> 200 -> STOR -> 150 -> server opens data connection.
+        """
+        remote_ip = self.remote_ip
+        if remote_ip.startswith("::ffff:"):
+            remote_ip = remote_ip[7:]
+        if not self.permit_foreign_addresses and ip != remote_ip:
+            msg = f"501 Rejected data connection to foreign address {ip}:{port}."
+            self.respond_w_warning(msg)
+            return
+        if not self.permit_privileged_ports and port < 1024:
+            msg = f'501 PORT against the privileged port "{port}" refused.'
+            self.respond_w_warning(msg)
+            return
+
+        self._shutdown_connecting_dtp()
+        if self.data_channel is not None:
+            self.data_channel.close()
+            self.data_channel = None
+        if not self.server._accept_new_cons():
+            self.respond_w_warning("425 Too many connections. Can't open data channel.")
+            return
+
+        self._deferred_active_addr = (ip, port)
+        logger.info(f"[FTP] Conexao ativa adiada para STOR: {ip}:{port}")
+        self.respond("200 PORT command successful.")
+
+    def ftp_STOR(self, *args, **kwargs):
+        logger.info(f"[FTP] STOR solicitado por {self.remote_ip}: {args[0] if args else ''}")
+        result = super().ftp_STOR(*args, **kwargs)
+        deferred_addr = getattr(self, "_deferred_active_addr", None)
+        if deferred_addr and self.data_channel is None and self._in_dtp_queue is not None:
+            ip, port = deferred_addr
+            self._deferred_active_addr = None
+            logger.info(f"[FTP] Abrindo conexao ativa apos STOR para {ip}:{port}")
+            self._dtp_connector = self.active_dtp(ip, port, self)
+        return result
+
     def respond(self, resp, logfun=None):
         if isinstance(resp, str) and resp[:3] in {"150", "200", "226", "227", "229", "425", "426", "451", "550"}:
             logger.info(f"[FTP] Resposta para {self.remote_ip}: {resp}")
@@ -49,10 +91,6 @@ class LoggingFTPHandler(FTPHandler):
     def ftp_EPSV(self, *args, **kwargs):
         logger.info(f"[FTP] EPSV solicitado por {self.remote_ip}")
         return super().ftp_EPSV(*args, **kwargs)
-
-    def ftp_STOR(self, *args, **kwargs):
-        logger.info(f"[FTP] STOR solicitado por {self.remote_ip}: {args[0] if args else ''}")
-        return super().ftp_STOR(*args, **kwargs)
 
     def ftp_ABOR(self, *args, **kwargs):
         logger.warning(f"[FTP] ABOR solicitado por {self.remote_ip}")
