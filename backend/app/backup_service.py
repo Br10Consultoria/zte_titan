@@ -31,6 +31,33 @@ _ftp_signature = None
 
 
 class LoggingFTPHandler(FTPHandler):
+    def respond(self, resp, logfun=None):
+        if isinstance(resp, str) and resp[:3] in {"150", "200", "226", "227", "229", "425", "426", "451", "550"}:
+            logger.info(f"[FTP] Resposta para {self.remote_ip}: {resp}")
+        if logfun is None:
+            return super().respond(resp)
+        return super().respond(resp, logfun=logfun)
+
+    def ftp_PORT(self, *args, **kwargs):
+        logger.info(f"[FTP] PORT solicitado por {self.remote_ip}: {args[0] if args else ''}")
+        return super().ftp_PORT(*args, **kwargs)
+
+    def ftp_PASV(self, *args, **kwargs):
+        logger.info(f"[FTP] PASV solicitado por {self.remote_ip}")
+        return super().ftp_PASV(*args, **kwargs)
+
+    def ftp_EPSV(self, *args, **kwargs):
+        logger.info(f"[FTP] EPSV solicitado por {self.remote_ip}")
+        return super().ftp_EPSV(*args, **kwargs)
+
+    def ftp_STOR(self, *args, **kwargs):
+        logger.info(f"[FTP] STOR solicitado por {self.remote_ip}: {args[0] if args else ''}")
+        return super().ftp_STOR(*args, **kwargs)
+
+    def ftp_ABOR(self, *args, **kwargs):
+        logger.warning(f"[FTP] ABOR solicitado por {self.remote_ip}")
+        return super().ftp_ABOR(*args, **kwargs)
+
     def on_connect(self):
         logger.info(f"[FTP] Conexao de {self.remote_ip}:{self.remote_port}")
 
@@ -87,6 +114,7 @@ def ensure_ftp_server(settings: BackupSettings) -> bool:
         return False
 
     signature = (
+        settings.server_ip,
         settings.ftp_bind_host,
         settings.ftp_port,
         settings.ftp_user,
@@ -111,6 +139,9 @@ def ensure_ftp_server(settings: BackupSettings) -> bool:
         handler = LoggingFTPHandler
         handler.authorizer = authorizer
         handler.passive_ports = _parse_passive_ports(settings.ftp_passive_ports)
+        handler.permit_foreign_addresses = True
+        handler.permit_privileged_ports = True
+        handler.tcp_no_delay = True
         if settings.server_ip:
             handler.masquerade_address = settings.server_ip
 
@@ -230,6 +261,17 @@ def run_backup_job(job_id: int, send_telegram_flag: bool = True):
         job.command_output = safe_output[-8000:] if safe_output else ""
         db.commit()
         logger.info(f"[BACKUP] Saida do comando copy ftp ({len(safe_output)} chars): {safe_output[-1000:]}")
+
+        if "%Error" in safe_output:
+            existing = [
+                f"{p.name} ({p.stat().st_size} bytes)"
+                for p in FTP_DIR.glob("*")
+                if p.is_file()
+            ]
+            raise RuntimeError(
+                "OLT retornou erro durante o envio FTP. "
+                f"Saida: {safe_output[-500:]}. Arquivos no FTP: {existing or 'nenhum'}"
+            )
 
         deadline = time.time() + 120
         while time.time() < deadline:
