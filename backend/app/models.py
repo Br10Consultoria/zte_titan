@@ -114,3 +114,18 @@ class BackupJob(Base):
     command_output = Column(Text, nullable=True)
 
     olt = relationship("OLT")
+
+
+class ProvisionTemplate(Base):
+    __tablename__ = "provision_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    model_alias = Column(String(100), nullable=True)
+    vlan = Column(Integer, default=1)
+    onu_type = Column(String(80), default="ZTE-F601")
+    start_onu_number = Column(Integer, default=1)
+    commands = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -63,6 +63,21 @@ function app() {
     uncfgOltId: '',
     uncfgData: null,
     uncfgLoading: false,
+    provisionTemplates: [],
+    provisionTemplateModal: false,
+    provisionTemplateEditId: null,
+    provisionTemplateForm: {
+      name: 'Bridge',
+      model_alias: 'ZTE-F601',
+      vlan: 1,
+      onu_type: 'ZTE-F601',
+      start_onu_number: 1,
+      is_active: true,
+      commands: '',
+    },
+    provisionModal: false,
+    provisionTarget: null,
+    provisionForm: { template_id: '', onu_number: 1, cli_name: '', vlan: 1, onu_type: '' },
 
     // Search
     searchOltId: '',
@@ -377,6 +392,7 @@ function app() {
       if (p === 'users') this.loadUsers();
       if (p === 'backups') this.loadBackupPage();
       if (p === 'search') this.loadSearchPage();
+      if (p === 'uncfg') this.loadProvisionTemplates();
     },
 
     // ============================================================
@@ -840,6 +856,119 @@ function app() {
         this.showToast(e.message, 'error');
       } finally {
         this.uncfgLoading = false;
+      }
+    },
+
+    defaultProvisionCommands() {
+      return `configure terminal
+interface gpon_olt-[*PORT_NAME]
+onu [*ONU_NUMBER] type [*ONU_TYPE] SN [ONU_SERIAL]
+exit
+interface gpon_onu-[*PORT_NAME]:[*ONU_NUMBER]
+name FND_TEXT([*CLI_NOME])
+tcont 4 profile default
+gemport 1 tcont 4
+exit
+interface vport-[*PORT_NAME].[*ONU_NUMBER]:1
+service-port 1 user-vlan [*PORT_VLAN] vlan [*PORT_VLAN]
+exit
+pon-onu-mng gpon_onu-[*PORT_NAME]:[*ONU_NUMBER]
+service 1 gemport 1 vlan [*PORT_VLAN]
+vlan port eth_0/1 mode tag vlan [*PORT_VLAN]
+end
+write`;
+    },
+
+    async loadProvisionTemplates() {
+      try {
+        const res = await this.apiGet('/onus/provision-templates');
+        if (res.ok) {
+          this.provisionTemplates = await this.safeJson(res);
+          if (!this.provisionTemplateForm.commands) this.provisionTemplateForm.commands = this.defaultProvisionCommands();
+        }
+      } catch (e) {}
+    },
+
+    openProvisionTemplateModal(tpl = null) {
+      this.provisionTemplateEditId = tpl ? tpl.id : null;
+      this.provisionTemplateForm = tpl ? { ...tpl } : {
+        name: 'Bridge',
+        model_alias: 'ZTE-F601',
+        vlan: 1,
+        onu_type: 'ZTE-F601',
+        start_onu_number: 1,
+        is_active: true,
+        commands: this.defaultProvisionCommands(),
+      };
+      this.provisionTemplateModal = true;
+    },
+
+    async saveProvisionTemplate() {
+      try {
+        const res = this.provisionTemplateEditId
+          ? await this.apiPut(`/onus/provision-templates/${this.provisionTemplateEditId}`, this.provisionTemplateForm)
+          : await this.apiPost('/onus/provision-templates', this.provisionTemplateForm);
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro ao salvar template');
+        this.provisionTemplateModal = false;
+        await this.loadProvisionTemplates();
+        this.showToast('Template salvo!', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async deleteProvisionTemplate(tpl) {
+      if (!confirm(`Remover template ${tpl.name}?`)) return;
+      try {
+        const res = await this.apiDelete(`/onus/provision-templates/${tpl.id}`);
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro ao remover template');
+        await this.loadProvisionTemplates();
+        this.showToast('Template removido!', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    openProvisionModal(onu) {
+      const tpl = this.provisionTemplates.find(t => t.is_active) || this.provisionTemplates[0];
+      this.provisionTarget = onu;
+      this.provisionForm = {
+        template_id: tpl ? tpl.id : '',
+        onu_number: tpl ? (tpl.start_onu_number || 1) : 1,
+        cli_name: onu.serial || '',
+        vlan: tpl ? (tpl.vlan || 1) : 1,
+        onu_type: tpl ? (tpl.onu_type || onu.model || 'ZTE-F601') : (onu.model || 'ZTE-F601'),
+      };
+      this.provisionModal = true;
+    },
+
+    onProvisionTemplateChange() {
+      const tpl = this.provisionTemplates.find(t => String(t.id) === String(this.provisionForm.template_id));
+      if (!tpl) return;
+      this.provisionForm.vlan = tpl.vlan || this.provisionForm.vlan || 1;
+      this.provisionForm.onu_type = tpl.onu_type || this.provisionTarget?.model || 'ZTE-F601';
+      this.provisionForm.onu_number = tpl.start_onu_number || this.provisionForm.onu_number || 1;
+    },
+
+    async provisionONU() {
+      if (!this.uncfgOltId || !this.provisionTarget) return;
+      if (!confirm(`Provisionar ${this.provisionTarget.serial} na porta ${this.provisionTarget.onu_index}?`)) return;
+      try {
+        const res = await this.apiPost(`/onus/${this.uncfgOltId}/provision`, {
+          ...this.provisionForm,
+          port_name: this.provisionTarget.onu_index,
+          serial: this.provisionTarget.serial,
+          model: this.provisionTarget.model,
+        });
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro ao provisionar ONU');
+        this.provisionModal = false;
+        this.showToast(data.message || 'Provisionamento enviado!', 'success');
+        await this.loadUncfgONUs(true);
+      } catch (e) {
+        this.showToast(e.message, 'error');
       }
     },
 

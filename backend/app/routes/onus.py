@@ -5,7 +5,8 @@ Suporta múltiplos modelos via olt_driver.py:
   zte_c300 — ZTE C300/C300M/C300T Titan   (gpon_olt-SLOT/CARD/PON)
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
+import re
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
@@ -21,7 +22,7 @@ def _now_iso():
     return datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
 from ..database import get_db
-from ..models import User, OLT, OLTPort
+from ..models import User, OLT, OLTPort, ProvisionTemplate
 from ..auth import get_current_user
 from ..olt_client import (
     get_olt_client, OLTConnectionError,
@@ -50,6 +51,172 @@ def _get_port(olt_id: int, slot: int, card: int, pon: int, db: Session) -> Optio
         OLTPort.card == card,
         OLTPort.pon == pon
     ).first()
+
+
+def _template_dict(tpl: ProvisionTemplate) -> dict:
+    return {
+        "id": tpl.id,
+        "name": tpl.name,
+        "model_alias": tpl.model_alias,
+        "vlan": tpl.vlan,
+        "onu_type": tpl.onu_type,
+        "start_onu_number": tpl.start_onu_number,
+        "commands": tpl.commands,
+        "is_active": tpl.is_active,
+    }
+
+
+def _safe_cli_name(value: str) -> str:
+    value = (value or "CLIENTE").strip()
+    value = re.sub(r"\s+", "_", value)
+    return re.sub(r"[^A-Za-z0-9_.-]", "", value)[:64] or "CLIENTE"
+
+
+def _render_template(commands: str, values: dict) -> list:
+    cli_name = _safe_cli_name(values.get("cli_name", "CLIENTE"))
+    rendered = commands.replace("FND_TEXT([*CLI_NOME])", cli_name)
+    replacements = {
+        "[*PORT_NAME]": values["port_name"],
+        "[*ONU_NUMBER]": str(values["onu_number"]),
+        "[ONU_SERIAL]": values["serial"],
+        "[*ONU_TYPE]": values.get("onu_type") or "ZTE-F601",
+        "[*PORT_VLAN]": str(values["vlan"]),
+        "[*CLI_NOME]": cli_name,
+    }
+    for token, value in replacements.items():
+        rendered = rendered.replace(token, value)
+    return [
+        line.strip()
+        for line in rendered.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+
+@router.get("/provision-templates")
+def list_provision_templates(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    templates = db.query(ProvisionTemplate).order_by(ProvisionTemplate.name).all()
+    return [_template_dict(t) for t in templates]
+
+
+@router.post("/provision-templates")
+def create_provision_template(
+    body: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem criar templates")
+    tpl = ProvisionTemplate(
+        name=body.get("name") or "Template",
+        model_alias=body.get("model_alias") or "",
+        vlan=int(body.get("vlan") or 1),
+        onu_type=body.get("onu_type") or "ZTE-F601",
+        start_onu_number=int(body.get("start_onu_number") or 1),
+        commands=body.get("commands") or "",
+        is_active=bool(body.get("is_active", True)),
+    )
+    db.add(tpl)
+    db.commit()
+    db.refresh(tpl)
+    return _template_dict(tpl)
+
+
+@router.put("/provision-templates/{template_id}")
+def update_provision_template(
+    template_id: int,
+    body: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem editar templates")
+    tpl = db.query(ProvisionTemplate).filter(ProvisionTemplate.id == template_id).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template nao encontrado")
+    for field in ("name", "model_alias", "onu_type", "commands"):
+        if field in body:
+            setattr(tpl, field, body.get(field) or "")
+    for field in ("vlan", "start_onu_number"):
+        if field in body:
+            setattr(tpl, field, int(body.get(field) or 1))
+    if "is_active" in body:
+        tpl.is_active = bool(body.get("is_active"))
+    db.commit()
+    db.refresh(tpl)
+    return _template_dict(tpl)
+
+
+@router.delete("/provision-templates/{template_id}")
+def delete_provision_template(
+    template_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem remover templates")
+    tpl = db.query(ProvisionTemplate).filter(ProvisionTemplate.id == template_id).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template nao encontrado")
+    db.delete(tpl)
+    db.commit()
+    return {"success": True}
+
+
+@router.post("/{olt_id}/provision")
+def provision_onu(
+    olt_id: int,
+    body: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem provisionar ONUs")
+    olt = _get_olt_or_404(olt_id, db)
+    tpl = db.query(ProvisionTemplate).filter(ProvisionTemplate.id == int(body.get("template_id"))).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template nao encontrado")
+
+    values = {
+        "port_name": body.get("port_name") or body.get("onu_index") or "",
+        "onu_number": int(body.get("onu_number") or tpl.start_onu_number or 1),
+        "serial": body.get("serial") or "",
+        "vlan": int(body.get("vlan") or tpl.vlan or 1),
+        "onu_type": body.get("onu_type") or tpl.onu_type or body.get("model") or "ZTE-F601",
+        "cli_name": body.get("cli_name") or body.get("serial") or "CLIENTE",
+    }
+    if not values["port_name"] or not values["serial"]:
+        raise HTTPException(status_code=400, detail="Informe porta e serial da ONU")
+
+    commands = _render_template(tpl.commands, values)
+    client = None
+    try:
+        client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
+        client.connect()
+        outputs = []
+        for cmd in commands:
+            outputs.append(client.execute_command(cmd, timeout=45))
+        cache.delete(f"olt:{olt_id}:uncfg")
+        cache.delete_pattern(f"olt:{olt_id}:pon:*:status")
+        return {
+            "success": True,
+            "message": f"Provisionamento enviado para {values['serial']}",
+            "commands": commands,
+            "output": "\n".join(outputs)[-6000:],
+        }
+    except OLTConnectionError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"[PROVISION] Erro inesperado: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+    finally:
+        if client:
+            try:
+                client.disconnect()
+            except Exception:
+                pass
 
 
 @router.get("/{olt_id}/pon/{slot}/{card}/{pon}/status")

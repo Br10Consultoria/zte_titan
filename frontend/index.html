@@ -779,7 +779,7 @@
           <i class="fas fa-server"></i><span class="nav-label">OLTs</span>
         </div>
         <div @click="setPage('onus')" :class="{'active': page==='onus'}" class="nav-item" title="ONUs">
-          <i class="fas fa-router"></i><span class="nav-label">ONUs</span>
+          <i class="fas fa-network-wired"></i><span class="nav-label">ONUs</span>
         </div>
         <div @click="setPage('uncfg')" :class="{'active': page==='uncfg'}" class="nav-item" title="Não Provisionadas">
           <i class="fas fa-circle-exclamation"></i><span class="nav-label">Não Provisionadas</span>
@@ -887,7 +887,7 @@
           <i class="fas fa-bars"></i>
         </button>
         <div class="topbar-title">
-          <i :class="page==='dashboard'?'fas fa-gauge-high':page==='olts'?'fas fa-server':page==='onus'?'fas fa-router':page==='uncfg'?'fas fa-circle-exclamation':page==='search'?'fas fa-magnifying-glass':page==='backups'?'fas fa-cloud-arrow-up':page==='users'?'fas fa-users':'fas fa-user-gear'"></i>
+          <i :class="page==='dashboard'?'fas fa-gauge-high':page==='olts'?'fas fa-server':page==='onus'?'fas fa-network-wired':page==='uncfg'?'fas fa-circle-exclamation':page==='search'?'fas fa-magnifying-glass':page==='backups'?'fas fa-cloud-arrow-up':page==='users'?'fas fa-users':'fas fa-user-gear'"></i>
           <span x-text="page==='dashboard'?'Dashboard':page==='olts'?'Gerenciamento de OLTs':page==='onus'?'Status das ONUs':page==='uncfg'?'ONUs Não Provisionadas':page==='search'?'Buscar ONU por Serial':page==='backups'?'Backups de OLT':page==='users'?'Gerenciamento de Usuários':'Meu Perfil'"></span>
         </div>
         <div class="topbar-actions">
@@ -1080,7 +1080,7 @@
                         <td>
                           <div style="display:flex;gap:4px">
                             <button @click="testOLTConnection(olt)" class="btn btn-ghost btn-xs" title="Testar Conexão"><i class="fas fa-plug"></i></button>
-                            <button @click="openONUPage(olt)" class="btn btn-primary btn-xs"><i class="fas fa-router mr-1"></i>Ver ONUs</button>
+                            <button @click="openONUPage(olt)" class="btn btn-primary btn-xs"><i class="fas fa-network-wired mr-1"></i>Ver ONUs</button>
                           </div>
                         </td>
                       </tr>
@@ -1130,7 +1130,7 @@
                           <div style="display:flex;gap:4px">
                             <button @click="testOLTConnection(olt)" class="btn btn-ghost btn-xs" title="Testar Conexão"><i class="fas fa-plug"></i></button>
                             <template x-if="currentUser && currentUser.role === 'admin'">
-                              <button @click="discoverOLT(olt)" class="btn btn-warning btn-xs" title="Descobrir Portas"><i class="fas fa-radar"></i></button>
+                              <button @click="discoverOLT(olt)" class="btn btn-warning btn-xs" title="Descobrir Portas"><i class="fas fa-magnifying-glass"></i> Descobrir</button>
                             </template>
                             <template x-if="currentUser && currentUser.role === 'admin'">
                               <button @click="editOLT(olt)" class="btn btn-primary btn-xs" title="Editar"><i class="fas fa-pen"></i></button>
@@ -1206,7 +1206,7 @@
                         </td>
                         <td>
                           <button @click="openONUsByPort(selectedOLTForPorts, p)" class="btn btn-primary btn-xs">
-                            <i class="fas fa-router"></i> Ver ONUs
+                            <i class="fas fa-network-wired"></i> Ver ONUs
                           </button>
                         </td>
                       </tr>
@@ -1267,7 +1267,7 @@
             <!-- Stats -->
             <div x-show="onuStatusData" class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
               <div class="stat-card blue">
-                <div class="stat-icon blue"><i class="fas fa-router"></i></div>
+                <div class="stat-icon blue"><i class="fas fa-network-wired"></i></div>
                 <div class="stat-label">Total</div>
                 <div class="stat-value blue" x-text="onuStatusData ? onuStatusData.total : 0"></div>
               </div>
@@ -1394,7 +1394,7 @@
                       </tr>
                     </template>
                     <tr x-show="filteredONUs.length === 0 && onuStatusData">
-                      <td colspan="9"><div class="empty-state" style="padding:28px"><i class="fas fa-router"></i><p>Nenhuma ONU encontrada com os filtros aplicados.</p></div></td>
+                      <td colspan="9"><div class="empty-state" style="padding:28px"><i class="fas fa-network-wired"></i><p>Nenhuma ONU encontrada com os filtros aplicados.</p></div></td>
                     </tr>
                   </tbody>
                 </table>
@@ -1402,7 +1402,7 @@
             </div>
 
             <div x-show="!onuStatusData && !onuLoading" class="empty-state">
-              <i class="fas fa-router"></i>
+              <i class="fas fa-network-wired"></i>
               <p>Selecione uma OLT e uma porta PON para consultar as ONUs.</p>
             </div>
           </div>
@@ -1425,6 +1425,7 @@
                 <div style="display:flex;gap:6px;align-items:flex-end">
                   <button @click="loadUncfgONUs(false)" class="btn btn-primary" :disabled="!uncfgOltId"><i class="fas fa-search"></i> Consultar</button>
                   <button @click="loadUncfgONUs(true)" class="btn btn-warning btn-sm" :disabled="!uncfgOltId" title="Forçar atualização"><i class="fas fa-rotate-right"></i></button>
+                  <button @click="openProvisionTemplateModal()" class="btn btn-ghost" x-show="currentUser && currentUser.role === 'admin'"><i class="fas fa-file-code"></i> Templates</button>
                 </div>
               </div>
             </div>
@@ -1438,7 +1439,7 @@
               </div>
               <div class="table-wrap">
                 <table>
-                  <thead><tr><th>Porta OLT</th><th>Indice ONU</th><th>Modelo</th><th>Numero de Serie</th><th>PW</th></tr></thead>
+                  <thead><tr><th>Porta OLT</th><th>Indice ONU</th><th>Modelo</th><th>Numero de Serie</th><th>PW</th><th>Acoes</th></tr></thead>
                   <tbody>
                     <template x-for="onu in (uncfgData ? uncfgData.onus : [])" :key="onu.olt_index || onu.onu_index || onu.serial">
                       <tr>
@@ -1447,10 +1448,13 @@
                         <td x-text="onu.model || '-'"></td>
                         <td class="td-mono" style="color:#e3b341" x-text="onu.serial"></td>
                         <td class="td-mono" x-text="onu.password || '-'"></td>
+                        <td>
+                          <button @click="openProvisionModal(onu)" class="btn btn-success btn-xs" x-show="currentUser && currentUser.role === 'admin'"><i class="fas fa-plug"></i> Provisionar</button>
+                        </td>
                       </tr>
                     </template>
                     <tr x-show="!uncfgData || uncfgData.onus.length === 0">
-                      <td colspan="5"><div class="empty-state" style="padding:28px"><i class="fas fa-circle-check"></i><p>Nenhuma ONU nao provisionada encontrada.</p></div></td>
+                      <td colspan="6"><div class="empty-state" style="padding:28px"><i class="fas fa-circle-check"></i><p>Nenhuma ONU nao provisionada encontrada.</p></div></td>
                     </tr>
                   </tbody>
                 </table>
@@ -1864,12 +1868,94 @@
     </div>
   </div>
 
+  <!-- Provision Template Modal -->
+  <div x-show="provisionTemplateModal" class="modal-overlay" @click.self="provisionTemplateModal=false">
+    <div class="modal modal-lg" style="max-width:980px">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fas fa-file-code"></i> <span x-text="provisionTemplateEditId ? 'Editar Template' : 'Novo Template'"></span></div>
+        <button @click="provisionTemplateModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div><label class="form-label">Nome</label><input x-model="provisionTemplateForm.name" class="input-field" /></div>
+        <div><label class="form-label">Alias do Modelo</label><input x-model="provisionTemplateForm.model_alias" class="input-field" /></div>
+        <div><label class="form-label">Tipo ONU</label><input x-model="provisionTemplateForm.onu_type" class="input-field" /></div>
+        <div><label class="form-label">VLAN</label><input x-model.number="provisionTemplateForm.vlan" type="number" class="input-field" /></div>
+        <div><label class="form-label">Numero inicial ONU</label><input x-model.number="provisionTemplateForm.start_onu_number" type="number" class="input-field" /></div>
+        <div style="display:flex;align-items:end">
+          <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-secondary)"><input type="checkbox" x-model="provisionTemplateForm.is_active" /> Ativo</label>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label class="form-label">Comandos</label>
+        <textarea x-model="provisionTemplateForm.commands" class="input-field" style="height:260px;font-family:monospace;resize:vertical"></textarea>
+      </div>
+      <div class="card card-body" style="margin-top:12px" x-show="provisionTemplates.length">
+        <div style="font-weight:700;margin-bottom:8px;color:var(--text-secondary)">Templates cadastrados</div>
+        <div style="display:grid;gap:6px">
+          <template x-for="tpl in provisionTemplates" :key="tpl.id">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:6px;padding:8px">
+              <div>
+                <div class="td-primary" x-text="tpl.name"></div>
+                <div style="font-size:11px;color:var(--text-muted)" x-text="`${tpl.model_alias || '-'} | VLAN ${tpl.vlan || '-'} | ${tpl.onu_type || '-'}`"></div>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button @click="openProvisionTemplateModal(tpl)" class="btn btn-primary btn-xs"><i class="fas fa-pen"></i> Editar</button>
+                <button @click="deleteProvisionTemplate(tpl)" class="btn btn-danger btn-xs"><i class="fas fa-trash"></i></button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+        <button @click="provisionTemplateModal=false" class="btn btn-ghost">Cancelar</button>
+        <button @click="saveProvisionTemplate()" class="btn btn-success"><i class="fas fa-save"></i> Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Provision ONU Modal -->
+  <div x-show="provisionModal" class="modal-overlay" @click.self="provisionModal=false">
+    <div class="modal" style="max-width:620px">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fas fa-plug"></i> Provisionar ONU</div>
+        <button @click="provisionModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+      </div>
+      <div x-show="provisionTarget" class="card card-body" style="margin-bottom:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+          <div><strong>Porta:</strong> <span class="td-mono" x-text="provisionTarget ? (provisionTarget.olt_index || provisionTarget.onu_index) : ''"></span></div>
+          <div><strong>Serial:</strong> <span class="td-mono" x-text="provisionTarget ? provisionTarget.serial : ''"></span></div>
+          <div><strong>Modelo:</strong> <span x-text="provisionTarget ? (provisionTarget.model || '-') : ''"></span></div>
+          <div><strong>PW:</strong> <span class="td-mono" x-text="provisionTarget ? (provisionTarget.password || '-') : ''"></span></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="grid-column:1 / -1">
+          <label class="form-label">Template</label>
+          <select x-model="provisionForm.template_id" @change="onProvisionTemplateChange()" class="input-field">
+            <option value="">Selecione um template</option>
+            <template x-for="tpl in provisionTemplates" :key="tpl.id">
+              <option :value="tpl.id" x-text="tpl.name"></option>
+            </template>
+          </select>
+        </div>
+        <div><label class="form-label">Numero da ONU</label><input x-model.number="provisionForm.onu_number" type="number" class="input-field" min="1" /></div>
+        <div><label class="form-label">VLAN</label><input x-model.number="provisionForm.vlan" type="number" class="input-field" min="1" /></div>
+        <div><label class="form-label">Tipo ONU</label><input x-model="provisionForm.onu_type" class="input-field" /></div>
+        <div><label class="form-label">Nome Cliente</label><input x-model="provisionForm.cli_name" class="input-field" placeholder="Ex: cliente_101" /></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+        <button @click="provisionModal=false" class="btn btn-ghost">Cancelar</button>
+        <button @click="provisionONU()" class="btn btn-success" :disabled="!provisionForm.template_id"><i class="fas fa-plug"></i> Provisionar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ONU Detail Modal -->
   <div x-show="onuDetailModal" class="modal-overlay" @click.self="closeONUDetail()">
     <div class="modal modal-lg">
       <div class="modal-header">
         <div class="modal-title">
-          <i class="fas fa-router"></i>
+          <i class="fas fa-network-wired"></i>
           Detalhes da ONU
           <span x-show="onuDetailData" x-text="onuDetailData ? onuDetailData.onu_interface || onuDetailData.onu_index || '' : ''"
                 style="color:#79c0ff;font-family:monospace;font-size:12.5px;background:var(--accent-glow);padding:2px 8px;border-radius:5px;border:1px solid var(--accent-border)"></span>
