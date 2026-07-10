@@ -79,7 +79,7 @@ def _setup_logging():
 _LOG_FILE = _setup_logging()
 from .database import init_db, SessionLocal
 from .auth import create_default_admin
-from .routes import auth, olts, onus, backups
+from .routes import auth, olts, onus, backups, dashboard
 from .olt_status_cache import start_hourly_status_refresh
 from .backup_service import ensure_ftp_server, get_or_create_settings
 
@@ -116,6 +116,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(olts.router, prefix="/api")
 app.include_router(onus.router, prefix="/api")
 app.include_router(backups.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
 
 @app.get("/api/logs")

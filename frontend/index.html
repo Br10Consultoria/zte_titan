@@ -937,6 +937,126 @@
               </div>
             </div>
 
+            <div x-show="dashboardAnalytics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:16px">
+              <div class="card card-body">
+                <div class="card-header" style="padding:0 0 12px;border:0">
+                  <span><i class="fas fa-chart-bar mr-2" style="color:var(--accent)"></i>ONUs por PON</span>
+                  <span class="badge badge-blue" x-text="dashboardAnalytics?.summary?.total_ports || 0"></span>
+                </div>
+                <div style="display:grid;gap:8px">
+                  <template x-for="p in (dashboardAnalytics?.pon_capacity || []).slice(0, 12)" :key="`${p.olt_id}-${p.slot}-${p.card}-${p.pon}`">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px">
+                        <span class="td-mono" x-text="p.label"></span>
+                        <span x-text="`${p.onu_count}/${p.onu_max}`"></span>
+                      </div>
+                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                        <div :style="{width: Math.min(p.percent,100)+'%', height:'100%', background: p.onu_count>=115?'#f85149':p.onu_count>=90?'#e3b341':p.onu_count>=64?'#58a6ff':'#3fb950'}"></div>
+                      </div>
+                    </div>
+                  </template>
+                  <div x-show="!dashboardAnalytics?.pon_capacity?.length" class="empty-state" style="padding:18px"><p>Sem portas PON descobertas.</p></div>
+                </div>
+              </div>
+
+              <div class="card card-body">
+                <div class="card-header" style="padding:0 0 12px;border:0">
+                  <span><i class="fas fa-triangle-exclamation mr-2" style="color:#e3b341"></i>PONs cheias / atenção</span>
+                  <span class="badge badge-red" x-text="dashboardAnalytics?.summary?.full_pons || 0"></span>
+                </div>
+                <div style="display:grid;gap:8px">
+                  <template x-for="p in [...(dashboardAnalytics?.full_pons || []), ...(dashboardAnalytics?.warning_pons || [])].slice(0, 12)" :key="`${p.olt_id}-${p.slot}-${p.card}-${p.pon}`">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border-dim);padding-bottom:7px">
+                      <span class="td-mono" x-text="p.label"></span>
+                      <span :class="p.onu_count>=115?'badge badge-red':'badge badge-yellow'" x-text="`${p.onu_count}/${p.onu_max}`"></span>
+                    </div>
+                  </template>
+                  <div x-show="!(dashboardAnalytics?.full_pons?.length || dashboardAnalytics?.warning_pons?.length)" class="empty-state" style="padding:18px"><p>Nenhuma PON em atenção.</p></div>
+                </div>
+              </div>
+
+              <div class="card card-body">
+                <div class="card-header" style="padding:0 0 12px;border:0">
+                  <span><i class="fas fa-signal mr-2" style="color:#3fb950"></i>Sinal das ONUs</span>
+                  <span class="badge badge-blue" x-text="dashboardAnalytics?.summary?.cached_onus || 0"></span>
+                </div>
+                <div style="display:grid;gap:8px">
+                  <template x-for="item in (dashboardAnalytics?.signals || [])" :key="item.label">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                        <span x-text="signalLabel(item.label)"></span>
+                        <span x-text="item.count"></span>
+                      </div>
+                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                        <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.signals))+'%', height:'100%', background: item.label==='normal'?'#3fb950':item.label==='warning'?'#e3b341':item.label==='critical'?'#f85149':'#8b949e'}"></div>
+                      </div>
+                    </div>
+                  </template>
+                  <div x-show="!dashboardAnalytics?.signals?.length" class="empty-state" style="padding:18px"><p>Sem dados de sinal no cache.</p></div>
+                </div>
+              </div>
+
+              <div class="card card-body">
+                <div class="card-header" style="padding:0 0 12px;border:0">
+                  <span><i class="fas fa-toggle-on mr-2" style="color:var(--accent)"></i>Estados das ONUs</span>
+                </div>
+                <div style="display:grid;gap:8px">
+                  <template x-for="item in (dashboardAnalytics?.states || [])" :key="item.label">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                        <span x-text="item.label"></span>
+                        <span x-text="item.count"></span>
+                      </div>
+                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                        <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.states))+'%', height:'100%', background: item.label==='working'?'#3fb950':item.label==='los'||item.label==='lof'?'#f85149':'#e3b341'}"></div>
+                      </div>
+                    </div>
+                  </template>
+                  <div x-show="!dashboardAnalytics?.states?.length" class="empty-state" style="padding:18px"><p>Sem estados no cache.</p></div>
+                </div>
+              </div>
+
+              <div class="card card-body">
+                <div class="card-header" style="padding:0 0 12px;border:0">
+                  <span><i class="fas fa-microchip mr-2" style="color:var(--purple)"></i>Modelos / marcas mais usados</span>
+                </div>
+                <div style="display:grid;gap:8px">
+                  <template x-for="item in (dashboardAnalytics?.models || [])" :key="item.label">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                        <span x-text="item.label"></span>
+                        <span x-text="item.count"></span>
+                      </div>
+                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                        <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.models))+'%', height:'100%', background:'#8957e5'}"></div>
+                      </div>
+                    </div>
+                  </template>
+                  <div x-show="!dashboardAnalytics?.models?.length" class="empty-state" style="padding:18px"><p>Sem modelos no cache.</p></div>
+                </div>
+              </div>
+
+              <div class="card card-body">
+                <div class="card-header" style="padding:0 0 12px;border:0">
+                  <span><i class="fas fa-code-branch mr-2" style="color:#58a6ff"></i>Firmwares encontrados</span>
+                </div>
+                <div style="display:grid;gap:8px">
+                  <template x-for="item in (dashboardAnalytics?.firmwares || [])" :key="item.label">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                        <span class="td-mono" x-text="item.label"></span>
+                        <span x-text="item.count"></span>
+                      </div>
+                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                        <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.firmwares))+'%', height:'100%', background:'#58a6ff'}"></div>
+                      </div>
+                    </div>
+                  </template>
+                  <div x-show="!dashboardAnalytics?.firmwares?.length" class="empty-state" style="padding:18px"><p>Sem firmware registrado.</p></div>
+                </div>
+              </div>
+            </div>
+
             <div class="card">
               <div class="card-header">
                 <span><i class="fas fa-server mr-2" style="color:var(--accent)"></i>OLTs Cadastradas</span>

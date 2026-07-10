@@ -1,0 +1,112 @@
+from collections import Counter
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from ..auth import get_current_user
+from ..database import get_db
+from ..models import OLT, OLTPort, User
+from ..olt_status_cache import pon_status_cache_key
+from ..redis_client import cache
+
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+
+def _label_pon(olt: OLT, port: OLTPort) -> str:
+    return f"{olt.name} {port.slot}/{port.card or 1}/{port.pon}"
+
+
+def _count_items(counter: Counter, limit: int = 12):
+    return [
+        {"label": str(label), "count": count}
+        for label, count in counter.most_common(limit)
+        if label not in (None, "")
+    ]
+
+
+@router.get("/analytics")
+def dashboard_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    olts = db.query(OLT).order_by(OLT.name).all()
+    ports = db.query(OLTPort).order_by(OLTPort.olt_id, OLTPort.slot, OLTPort.card, OLTPort.pon).all()
+    olt_by_id = {olt.id: olt for olt in olts}
+
+    pon_capacity = []
+    full_pons = []
+    warning_pons = []
+    signal_counts = Counter()
+    model_counts = Counter()
+    firmware_counts = Counter()
+    state_counts = Counter()
+    cached_ports = 0
+    cached_onus = 0
+    redis_available = cache.is_available()
+
+    for olt in olts:
+        if olt.firmware:
+            firmware_counts[olt.firmware] += 1
+
+    for port in ports:
+        olt = olt_by_id.get(port.olt_id)
+        if not olt:
+            continue
+        max_onus = port.onu_max or 128
+        percent = round((port.onu_count or 0) / max_onus * 100, 1) if max_onus else 0
+        item = {
+            "olt_id": olt.id,
+            "olt": olt.name,
+            "slot": port.slot,
+            "card": port.card or 1,
+            "pon": port.pon,
+            "label": _label_pon(olt, port),
+            "onu_count": port.onu_count or 0,
+            "onu_max": max_onus,
+            "percent": percent,
+        }
+        pon_capacity.append(item)
+        if (port.onu_count or 0) >= 115:
+            full_pons.append(item)
+        elif (port.onu_count or 0) >= 90:
+            warning_pons.append(item)
+
+        status = cache.get(pon_status_cache_key(port.olt_id, port.slot, port.card or 1, port.pon)) if redis_available else None
+        if not status:
+            continue
+        cached_ports += 1
+        onus = status.get("onus") or []
+        cached_onus += len(onus)
+        for onu in onus:
+            state_counts[(onu.get("oper_state") or "unknown").lower()] += 1
+            signal_counts[(onu.get("olt_rx_status") or "sem leitura").lower()] += 1
+            if onu.get("model"):
+                model_counts[onu["model"]] += 1
+            fw = (
+                onu.get("firmware")
+                or onu.get("software_version")
+                or onu.get("current_version")
+                or onu.get("version")
+            )
+            if fw:
+                firmware_counts[fw] += 1
+
+    pon_capacity.sort(key=lambda item: item["onu_count"], reverse=True)
+
+    return {
+        "summary": {
+            "total_olts": len(olts),
+            "total_ports": len(ports),
+            "cached_ports": cached_ports,
+            "cached_onus": cached_onus,
+            "full_pons": len(full_pons),
+            "warning_pons": len(warning_pons),
+        },
+        "pon_capacity": pon_capacity[:24],
+        "full_pons": full_pons,
+        "warning_pons": warning_pons,
+        "signals": _count_items(signal_counts),
+        "models": _count_items(model_counts, 15),
+        "firmwares": _count_items(firmware_counts, 15),
+        "states": _count_items(state_counts),
+    }

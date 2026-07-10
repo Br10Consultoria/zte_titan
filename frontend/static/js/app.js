@@ -114,6 +114,7 @@ function app() {
 
     // Stats
     stats: {},
+    dashboardAnalytics: null,
 
     // ============================================================
     // INIT
@@ -305,18 +306,26 @@ function app() {
       } catch (e) {}
       this.stats.total_olts = this.olts.length;
       this.stats.online_olts = this.olts.filter(o => o.status === 'online').length;
-      // Count ports
-      let totalPorts = 0;
-      for (const olt of this.olts) {
-        try {
-          const res = await this.apiGet(`/olts/${olt.id}/ports`);
-          if (res.ok) {
-            const ports = await this.safeJson(res);
-            totalPorts += ports.length;
-          }
-        } catch (e) {}
-      }
-      this.stats.total_ports = totalPorts;
+      try {
+        const res = await this.apiGet('/dashboard/analytics');
+        if (res.ok) {
+          this.dashboardAnalytics = await this.safeJson(res);
+          this.stats.total_ports = this.dashboardAnalytics.summary.total_ports || 0;
+        }
+      } catch (e) {}
+    },
+
+    chartMax(items) {
+      return Math.max(...(items || []).map(i => Number(i.count || i.onu_count || 0)), 1);
+    },
+
+    chartPercent(value, max) {
+      return Math.max(3, Math.round(Number(value || 0) / Math.max(Number(max || 1), 1) * 100));
+    },
+
+    signalLabel(label) {
+      const map = { normal: 'Bom', warning: 'Ruim', critical: 'Pessimo', 'sem leitura': 'Sem leitura' };
+      return map[label] || label;
     },
 
     setPage(p) {
