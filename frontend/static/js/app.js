@@ -656,6 +656,42 @@ function app() {
       }
     },
 
+    async removeONU(onu = null) {
+      let ctx = null;
+      let serial = '';
+      if (onu) {
+        if (!this.onuFilter.port_id) return;
+        const parts = this.onuFilter.port_id.split('|');
+        ctx = {
+          oltId: this.onuFilter.olt_id,
+          slot: parts[1],
+          card: parts[2] || '1',
+          pon: parts[3] || parts[2],
+          onuId: String(onu.onu_index || '').split(':').pop(),
+        };
+        serial = onu.serial || '';
+      } else if (this.onuDetailContext) {
+        ctx = this.onuDetailContext;
+        serial = this.onuDetailData?.detail?.serial_number || this.onuDetailData?.status?.serial || '';
+      }
+      if (!ctx || !ctx.onuId) return;
+
+      const iface = `${ctx.slot}/${ctx.card}/${ctx.pon}:${ctx.onuId}`;
+      const msg = `Remover a ONU ${iface}${serial ? ` (${serial})` : ''}?\n\nEsta acao executa "no onu ${ctx.onuId}" na OLT e salva com write.`;
+      if (!confirm(msg)) return;
+
+      try {
+        const res = await this.apiDelete(`/onus/${ctx.oltId}/pon/${ctx.slot}/${ctx.card}/${ctx.pon}/onu/${ctx.onuId}`);
+        const data = await this.safeJson(res);
+        if (!res.ok) throw new Error(data.detail || 'Erro ao remover ONU');
+        this.showToast(data.message || 'ONU removida com sucesso!', 'success');
+        if (!onu) this.closeONUDetail();
+        await this.loadONUStatus(true);
+      } catch (e) {
+        this.showToast(`Erro: ${e.message}`, 'error');
+      }
+    },
+
     async loadONUTraffic() {
       if (!this.onuDetailContext) return;
       const { oltId, slot, card, pon, onuId } = this.onuDetailContext;

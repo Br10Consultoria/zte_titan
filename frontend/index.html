@@ -1380,9 +1380,16 @@
                           </template>
                         </td>
                         <td>
-                          <button @click="openONUDetail(onu)" class="btn btn-primary btn-xs">
-                            <i class="fas fa-info-circle"></i> Detalhes
-                          </button>
+                          <div style="display:flex;gap:4px;align-items:center">
+                            <button @click="openONUDetail(onu)" class="btn btn-primary btn-xs">
+                              <i class="fas fa-info-circle"></i> Detalhes
+                            </button>
+                            <template x-if="currentUser && currentUser.role === 'admin'">
+                              <button @click="removeONU(onu)" class="btn btn-danger btn-xs" title="Remover ONU da OLT">
+                                <i class="fas fa-trash"></i>
+                              </button>
+                            </template>
+                          </div>
                         </td>
                       </tr>
                     </template>
@@ -1869,6 +1876,10 @@
           <button @click="rebootONU()" class="btn btn-danger btn-xs" title="Reiniciar ONU"
                   x-show="currentUser && currentUser.role === 'admin'">
             <i class="fas fa-power-off"></i> Reboot
+          </button>
+          <button @click="removeONU()" class="btn btn-danger btn-xs" title="Remover ONU da OLT"
+                  x-show="currentUser && currentUser.role === 'admin'">
+            <i class="fas fa-trash"></i> Remover
           </button>
           <button @click="closeONUDetail()" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
         </div>

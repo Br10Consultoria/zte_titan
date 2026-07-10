@@ -76,10 +76,12 @@ def get_pon_status(
     if not force_refresh:
         cached_data = cache.get(cache_key)
         if cached_data:
-            cached_data["cached"] = True
-            cache_info = cache.get_cache_info(cache_key)
-            cached_data["cache_expires_in"] = cache_info.get("expires_in")
-            return cached_data
+            if cached_data.get("details_included"):
+                cached_data["cached"] = True
+                cache_info = cache.get_cache_info(cache_key)
+                cached_data["cache_expires_in"] = cache_info.get("expires_in")
+                return cached_data
+            logger.info(f"[PON_STATUS] Cache sem detalhes para {cache_key}; atualizando para preencher uptime")
 
     iface = driver.olt_iface(slot, card, pon)
     logger.info(f"[PON_STATUS] Consultando {iface} na OLT {olt.ip} (modelo: {olt.olt_model})")
@@ -315,6 +317,71 @@ def onu_reboot(
     except Exception as e:
         logger.error(f"[REBOOT] Erro inesperado: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+
+
+@router.delete("/{olt_id}/pon/{slot}/{card}/{pon}/onu/{onu_id}")
+def onu_remove(
+    olt_id: int,
+    slot: int,
+    card: int,
+    pon: int,
+    onu_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Remove uma ONU provisionada da interface PON.
+    Sequencia ZTE: configure terminal -> interface OLT -> no onu ID -> write.
+    Requer perfil admin.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem remover ONUs")
+
+    olt = _get_olt_or_404(olt_id, db)
+    driver = get_driver(olt.olt_model)
+    olt_iface = driver.olt_iface(slot, card, pon)
+    logger.warning(f"[REMOVE_ONU] Solicitado por {current_user.username}: {olt_iface} onu {onu_id} em {olt.ip}")
+
+    client = None
+    try:
+        client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
+        client.connect()
+        commands = [
+            "configure terminal",
+            f"interface {olt_iface}",
+            f"no onu {onu_id}",
+            "exit",
+            "exit",
+            "write",
+        ]
+        outputs = []
+        for cmd in commands:
+            outputs.append(client.execute_command(cmd, timeout=30))
+
+        cache.delete(pon_status_cache_key(olt_id, slot, card, pon))
+        cache.delete(f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:full")
+        cache.delete(f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:detail")
+        cache.delete(f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:power")
+
+        return {
+            "success": True,
+            "message": f"ONU {onu_id} removida de {olt_iface}.",
+            "olt_interface": olt_iface,
+            "onu_id": onu_id,
+            "output": "\n".join(outputs)[-4000:],
+        }
+    except OLTConnectionError as e:
+        logger.error(f"[REMOVE_ONU] Erro de conexao: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"[REMOVE_ONU] Erro inesperado: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+    finally:
+        if client:
+            try:
+                client.disconnect()
+            except Exception:
+                pass
 
 
 @router.get("/{olt_id}/pon/{slot}/{card}/{pon}/onu/{onu_id}/traffic")

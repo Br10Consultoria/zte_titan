@@ -54,7 +54,7 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
 
     detail_map = {}
     if include_details:
-        for onu_item in onus[:60]:
+        for onu_item in onus:
             idx = onu_item["onu_index"]
             onu_iface = driver.onu_iface(idx)
             try:
@@ -101,6 +101,7 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
         "online": online,
         "offline": offline,
         "cached": False,
+        "details_included": include_details,
         "cache_expires_in": None,
         "last_updated": _now_iso(),
     }
