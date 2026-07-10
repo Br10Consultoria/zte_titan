@@ -907,24 +907,41 @@ def parse_olt_rx_power(output: str) -> Dict[str, float]:
 
 def parse_uncfg_onus(output: str) -> List[Dict]:
     """
-    Parseia: show gpon onu uncfg
-    Retorna ONUs não provisionadas com serial e interface.
+    Parseia saidas de ONUs nao provisionadas.
+    Preferencial: show pon onu uncfg
+      gpon_olt-1/2/1  VSOLV422  VSOL0009C4B0  1234567890
+    Fallback legado: show gpon onu uncfg
+      gpon-onu_1/2/2:99  ZTEG12345678
     """
     onus = []
     for line in output.split('\n'):
         line = line.strip()
-        # Formato: gpon-onu_1/2/2:99  ZTEG12345678
+        if not line or line.startswith('-') or line.lower().startswith('oltindex'):
+            continue
+
+        m0 = re.match(r'(gpon[_-]olt[-_]\d+/\d+/\d+)\s+(\S+)\s+(\S+)(?:\s+(\S+))?', line)
+        if m0:
+            olt_index = m0.group(1)
+            idx = re.sub(r'^gpon[_-]olt[-_]', '', olt_index)
+            onus.append({
+                "onu_index": idx,
+                "olt_index": olt_index,
+                "model": m0.group(2),
+                "serial": m0.group(3),
+                "password": m0.group(4) or "",
+            })
+            continue
+
         m = re.match(r'gpon-onu_(\d+/\d+(?:/\d+)?:\d+)\s+(\S+)', line)
         if m:
-            onus.append({"onu_index": m.group(1), "serial": m.group(2)})
+            onus.append({"onu_index": m.group(1), "serial": m.group(2), "model": "", "password": ""})
             continue
-        # Formato sem prefixo: 1/2/2:99  ZTEG12345678
+
         m2 = re.match(r'(\d+/\d+(?:/\d+)?:\d+)\s+(\S+)', line)
         if m2:
-            onus.append({"onu_index": m2.group(1), "serial": m2.group(2)})
-    _log("debug", f"[PARSER] parse_uncfg_onus: {len(onus)} ONUs não provisionadas")
+            onus.append({"onu_index": m2.group(1), "serial": m2.group(2), "model": "", "password": ""})
+    _log("debug", f"[PARSER] parse_uncfg_onus: {len(onus)} ONUs nao provisionadas")
     return onus
-
 
 def parse_olt_ports(output: str) -> List[Dict]:
     """

@@ -190,7 +190,10 @@ def get_unconfigured_onus(
         client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
         client.connect()
         # Comando para ONUs não configuradas (igual para todos os modelos ZTE)
-        out = client.execute_command("show gpon onu uncfg", timeout=30)
+        out = client.execute_command("show pon onu uncfg", timeout=30)
+        if "%Error" in out or "Invalid" in out or "Unknown" in out:
+            logger.warning("[UNCFG] show pon onu uncfg falhou; tentando comando legado")
+            out = client.execute_command("show gpon onu uncfg", timeout=30)
         client.disconnect()
 
         from ..olt_client import parse_uncfg_onus

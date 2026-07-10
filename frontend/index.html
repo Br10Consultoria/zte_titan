@@ -1438,16 +1438,19 @@
               </div>
               <div class="table-wrap">
                 <table>
-                  <thead><tr><th>Índice ONU</th><th>Número de Série</th></tr></thead>
+                  <thead><tr><th>Porta OLT</th><th>Indice ONU</th><th>Modelo</th><th>Numero de Serie</th><th>PW</th></tr></thead>
                   <tbody>
-                    <template x-for="onu in (uncfgData ? uncfgData.onus : [])" :key="onu.onu_index">
+                    <template x-for="onu in (uncfgData ? uncfgData.onus : [])" :key="onu.olt_index || onu.onu_index || onu.serial">
                       <tr>
-                        <td class="td-mono td-primary" x-text="onu.onu_index"></td>
+                        <td class="td-mono td-primary" x-text="onu.olt_index || onu.onu_index"></td>
+                        <td class="td-mono" x-text="onu.onu_index"></td>
+                        <td x-text="onu.model || '-'"></td>
                         <td class="td-mono" style="color:#e3b341" x-text="onu.serial"></td>
+                        <td class="td-mono" x-text="onu.password || '-'"></td>
                       </tr>
                     </template>
                     <tr x-show="!uncfgData || uncfgData.onus.length === 0">
-                      <td colspan="2"><div class="empty-state" style="padding:28px"><i class="fas fa-circle-check"></i><p>Nenhuma ONU não provisionada encontrada.</p></div></td>
+                      <td colspan="5"><div class="empty-state" style="padding:28px"><i class="fas fa-circle-check"></i><p>Nenhuma ONU nao provisionada encontrada.</p></div></td>
                     </tr>
                   </tbody>
                 </table>
