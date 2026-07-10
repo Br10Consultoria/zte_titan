@@ -67,6 +67,9 @@ function app() {
     // Search
     searchOltId: '',
     searchSerial: '',
+    searchModel: '',
+    searchPortId: '',
+    searchPorts: [],
     searchResults: null,
     searchLoading: false,
 
@@ -320,6 +323,7 @@ function app() {
       this.page = p;
       if (p === 'users') this.loadUsers();
       if (p === 'backups') this.loadBackupPage();
+      if (p === 'search') this.loadSearchPage();
     },
 
     // ============================================================
@@ -754,11 +758,20 @@ function app() {
     // SEARCH
     // ============================================================
     async searchONU() {
-      if (!this.searchOltId || !this.searchSerial) return;
+      if (!this.searchOltId || (!this.searchSerial && !this.searchModel && !this.searchPortId)) return;
       this.searchLoading = true;
       this.searchResults = null;
       try {
-        const res = await fetch(`${API_BASE}/onus/${this.searchOltId}/search?serial=${encodeURIComponent(this.searchSerial)}`, {
+        const params = new URLSearchParams();
+        if (this.searchSerial) params.set('serial', this.searchSerial);
+        if (this.searchModel) params.set('model', this.searchModel);
+        if (this.searchPortId) {
+          const parts = this.searchPortId.split('|');
+          params.set('slot', parts[1]);
+          params.set('card', parts[2] || '1');
+          params.set('pon', parts[3] || parts[2]);
+        }
+        const res = await fetch(`${API_BASE}/onus/${this.searchOltId}/search?${params.toString()}`, {
           headers: { 'Authorization': `Bearer ${this.getToken()}` }
         });
         const data = await this.safeJson(res);
@@ -769,6 +782,91 @@ function app() {
       } finally {
         this.searchLoading = false;
       }
+    },
+
+    async loadSearchPage() {
+      await this.loadOLTs();
+      if (this.searchOltId) await this.loadSearchPorts();
+    },
+
+    async loadSearchPorts() {
+      this.searchPortId = '';
+      this.searchPorts = [];
+      if (!this.searchOltId) return;
+      try {
+        const res = await this.apiGet(`/olts/${this.searchOltId}/ports`);
+        if (res.ok) this.searchPorts = await this.safeJson(res);
+      } catch (e) {}
+    },
+
+    printSearchResults() {
+      const results = this.searchResults || [];
+      const selectedOlt = this.olts.find(o => String(o.id) === String(this.searchOltId));
+      const filters = [
+        selectedOlt ? `OLT: ${selectedOlt.name}` : '',
+        this.searchPortId ? `PON: ${this.searchPortLabel(this.searchPorts.find(p => this.searchPortId === `${p.id}|${p.slot}|${p.card || 1}|${p.pon}`) || {})}` : '',
+        this.searchSerial ? `Serial: ${this.searchSerial}` : '',
+        this.searchModel ? `Modelo: ${this.searchModel}` : '',
+      ].filter(Boolean).join(' | ');
+      const rows = results.map(r => `
+        <tr>
+          <td>${this.escapeHtml(r.onu_index || '')}</td>
+          <td>${this.escapeHtml(r.serial || '')}</td>
+          <td>${this.escapeHtml(r.model || '-')}</td>
+          <td>${this.escapeHtml(r.admin_state || '-')}</td>
+          <td>${this.escapeHtml(r.oper_state || '-')}</td>
+          <td>${this.escapeHtml(String(r.slot || '-'))}</td>
+          <td>${this.escapeHtml(String(r.pon || r.port || '-'))}</td>
+        </tr>
+      `).join('');
+      const win = window.open('', '_blank', 'width=1100,height=800');
+      if (!win) {
+        this.showToast('Pop-up bloqueado pelo navegador', 'error');
+        return;
+      }
+      win.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>Busca de ONUs</title>
+            <style>
+              body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+              h1 { font-size: 20px; margin: 0 0 6px; }
+              .meta { color: #4b5563; font-size: 12px; margin-bottom: 18px; }
+              table { width: 100%; border-collapse: collapse; font-size: 12px; }
+              th, td { border: 1px solid #d1d5db; padding: 7px 8px; text-align: left; }
+              th { background: #eef2ff; color: #1e3a8a; }
+              @media print { body { margin: 12mm; } }
+            </style>
+          </head>
+          <body>
+            <h1>Resultado da busca de ONUs</h1>
+            <div class="meta">${this.escapeHtml(filters || 'Sem filtros')} | Total: ${results.length} | ${new Date().toLocaleString('pt-BR')}</div>
+            <table>
+              <thead><tr><th>Indice ONU</th><th>Serial</th><th>Modelo</th><th>Admin</th><th>Estado</th><th>Slot</th><th>Porta</th></tr></thead>
+              <tbody>${rows || '<tr><td colspan="7">Nenhuma ONU encontrada.</td></tr>'}</tbody>
+            </table>
+          </body>
+        </html>
+      `);
+      win.document.close();
+      win.focus();
+      win.print();
+    },
+
+    searchPortLabel(p) {
+      if (!p || !p.id) return 'Todas';
+      const olt = this.olts.find(o => String(o.id) === String(this.searchOltId));
+      return this.oltInterfaceLabel(p.slot, p.card || 1, p.pon, olt ? olt.olt_model : null);
+    },
+
+    escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     },
 
     // ============================================================

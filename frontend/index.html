@@ -1333,10 +1333,10 @@
         <div x-show="page === 'search'">
           <div class="page-body">
             <div class="card card-body mb-4">
-              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+              <div style="display:grid;grid-template-columns:170px minmax(180px,1fr) minmax(180px,1fr) minmax(210px,1fr) auto;gap:10px;align-items:end">
                 <div>
                   <label class="form-label">OLT</label>
-                  <select x-model="searchOltId" class="input-field" style="width:170px">
+                  <select x-model="searchOltId" @change="searchResults=null;loadSearchPorts()" class="input-field">
                     <option value="">Selecione a OLT</option>
                     <template x-for="olt in olts" :key="olt.id">
                       <option :value="olt.id" x-text="olt.name"></option>
@@ -1347,7 +1347,20 @@
                   <label class="form-label">Número de Série</label>
                   <input x-model="searchSerial" type="text" class="input-field" placeholder="Ex: ZTEG12345678" @keydown.enter="searchONU()" />
                 </div>
-                <button @click="searchONU()" class="btn btn-primary" :disabled="!searchOltId || !searchSerial" style="align-self:flex-end">
+                <div>
+                  <label class="form-label">Modelo</label>
+                  <input x-model="searchModel" type="text" class="input-field" placeholder="Ex: ZTE-F601V6." @keydown.enter="searchONU()" />
+                </div>
+                <div>
+                  <label class="form-label">Porta PON</label>
+                  <select x-model="searchPortId" class="input-field" :disabled="!searchOltId">
+                    <option value="">Todas as portas</option>
+                    <template x-for="p in searchPorts" :key="p.id">
+                      <option :value="`${p.id}|${p.slot}|${p.card || 1}|${p.pon}`" x-text="searchPortLabel(p)"></option>
+                    </template>
+                  </select>
+                </div>
+                <button @click="searchONU()" class="btn btn-primary" :disabled="!searchOltId || (!searchSerial && !searchModel && !searchPortId)" style="align-self:flex-end">
                   <i class="fas fa-search"></i> Buscar
                 </button>
               </div>
@@ -1358,7 +1371,10 @@
             <div x-show="searchResults !== null && !searchLoading" class="card">
               <div class="card-header">
                 <span>Resultados</span>
-                <span class="badge badge-blue" x-text="searchResults ? searchResults.length : 0"></span>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span class="badge badge-blue" x-text="searchResults ? searchResults.length : 0"></span>
+                  <button @click="printSearchResults()" class="btn btn-ghost btn-xs" :disabled="!searchResults"><i class="fas fa-print"></i> Imprimir</button>
+                </div>
               </div>
               <div class="table-wrap">
                 <table>

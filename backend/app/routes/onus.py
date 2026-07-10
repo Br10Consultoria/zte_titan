@@ -209,24 +209,40 @@ def get_unconfigured_onus(
 @router.get("/{olt_id}/search")
 def search_onu(
     olt_id: int,
-    serial: Optional[str] = Query(None, description="Número de série da ONU"),
+    serial: Optional[str] = Query(None, description="Numero de serie da ONU"),
+    model: Optional[str] = Query(None, description="Modelo da ONU"),
+    slot: Optional[int] = Query(None, description="Slot da porta PON"),
+    card: Optional[int] = Query(None, description="Card/subslot da porta PON"),
+    pon: Optional[int] = Query(None, description="Numero da porta PON"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Busca uma ONU pelo número de série em todas as portas PON."""
+    """Busca ONUs por serial, modelo e/ou porta PON."""
     olt = _get_olt_or_404(olt_id, db)
     driver = get_driver(olt.olt_model)
-    ports = db.query(OLTPort).filter(OLTPort.olt_id == olt_id).all()
+
+    ports_query = db.query(OLTPort).filter(OLTPort.olt_id == olt_id)
+    if slot is not None:
+        ports_query = ports_query.filter(OLTPort.slot == slot)
+    if card is not None:
+        ports_query = ports_query.filter(OLTPort.card == card)
+    if pon is not None:
+        ports_query = ports_query.filter(OLTPort.pon == pon)
+    ports = ports_query.all()
 
     if not ports:
         raise HTTPException(
             status_code=404,
             detail="Nenhuma porta PON descoberta. Execute a descoberta primeiro."
         )
-    if not serial:
-        raise HTTPException(status_code=400, detail="Informe o número de série (serial)")
+
+    serial_filter = (serial or "").strip().upper()
+    model_filter = (model or "").strip().upper()
+    if not serial_filter and not model_filter and pon is None:
+        raise HTTPException(status_code=400, detail="Informe serial, modelo ou porta PON para buscar")
 
     results = []
+    client = None
     try:
         client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
         client.connect()
@@ -236,19 +252,33 @@ def search_onu(
             out = client.execute_command(driver.cmd_onu_baseinfo(iface), timeout=20)
             onus = driver.parse_onu_baseinfo(out)
             for onu in onus:
-                if serial.upper() in onu.get("serial", "").upper():
-                    onu["slot"]          = p.slot
-                    onu["card"]          = p.card
-                    onu["pon"]           = p.pon
-                    onu["olt_interface"] = iface
-                    results.append(onu)
-
-        client.disconnect()
+                onu_serial = (onu.get("serial") or "").upper()
+                onu_model = (onu.get("model") or "").upper()
+                if serial_filter and serial_filter not in onu_serial:
+                    continue
+                if model_filter and model_filter not in onu_model:
+                    continue
+                onu["slot"]          = p.slot
+                onu["card"]          = p.card
+                onu["pon"]           = p.pon
+                onu["port"]          = p.pon
+                onu["olt_interface"] = iface
+                results.append(onu)
     except OLTConnectionError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    finally:
+        if client:
+            client.disconnect()
 
-    return {"results": results, "total": len(results), "serial_searched": serial}
-
+    return {
+        "results": results,
+        "total": len(results),
+        "serial_searched": serial,
+        "model_searched": model,
+        "slot": slot,
+        "card": card,
+        "pon": pon,
+    }
 
 @router.post("/{olt_id}/pon/{slot}/{card}/{pon}/onu/{onu_id}/reboot")
 def onu_reboot(
