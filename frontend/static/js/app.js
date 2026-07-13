@@ -514,18 +514,19 @@ function app() {
       }
     },
 
-    openONUsByPort(olt, port) {
+    async openONUsByPort(olt, port) {
       this.onuFilter.olt_id = String(olt.id);
-      this.loadOLTPortsForFilter();
+      await this.loadOLTPortsForFilter();
       // Formato: portId|slot|card|pon
       this.onuFilter.port_id = `${port.id}|${port.slot}|${port.card || 1}|${port.pon}`;
+      this.selectedOLTForPorts = null;
       this.setPage('onus');
-      this.loadONUStatus(false);
+      await this.loadONUStatus(false);
     },
 
-    openONUPage(olt) {
+    async openONUPage(olt) {
       this.onuFilter.olt_id = String(olt.id);
-      this.loadOLTPortsForFilter();
+      await this.loadOLTPortsForFilter();
       this.setPage('onus');
     },
 

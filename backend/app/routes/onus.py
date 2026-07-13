@@ -317,12 +317,10 @@ def get_pon_status(
     if not force_refresh:
         cached_data = cache.get(cache_key)
         if cached_data:
-            if cached_data.get("details_included"):
-                cached_data["cached"] = True
-                cache_info = cache.get_cache_info(cache_key)
-                cached_data["cache_expires_in"] = cache_info.get("expires_in")
-                return cached_data
-            logger.info(f"[PON_STATUS] Cache sem detalhes para {cache_key}; atualizando para preencher uptime")
+            cached_data["cached"] = True
+            cache_info = cache.get_cache_info(cache_key)
+            cached_data["cache_expires_in"] = cache_info.get("expires_in")
+            return cached_data
 
     iface = driver.olt_iface(slot, card, pon)
     logger.info(f"[PON_STATUS] Consultando {iface} na OLT {olt.ip} (modelo: {olt.olt_model})")
