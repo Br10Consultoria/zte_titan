@@ -108,6 +108,25 @@ def _record_signal_history(olt_id: int, slot: int, card: int, pon: int, onu_id: 
     return pruned
 
 
+def _last_closed_history_event(history: list) -> Optional[dict]:
+    for item in reversed(history or []):
+        if item.get("offline_time"):
+            return item
+    return None
+
+
+def _apply_last_down_from_history(result: dict) -> dict:
+    detail = result.get("detail") or {}
+    last_event = _last_closed_history_event(detail.get("history") or [])
+    if last_event:
+        detail["last_down_cause"] = last_event.get("cause")
+        detail["last_offline_time"] = last_event.get("offline_time")
+    if result.get("status") and result["status"].get("last_down_cause") and not detail.get("last_down_cause"):
+        detail["last_down_cause"] = result["status"].get("last_down_cause")
+    result["detail"] = detail
+    return result
+
+
 def _template_dict(tpl: ProvisionTemplate) -> dict:
     return {
         "id": tpl.id,
@@ -369,6 +388,7 @@ def get_onu_full_info(
             cached_data["cache_expires_in"] = cache_info.get("expires_in")
             cached_data["annotation"] = _annotation_dict(_get_annotation(db, olt_id, slot, card, pon, onu_id))
             cached_data["signal_history"] = cache.get(_signal_history_key(olt_id, slot, card, pon, onu_id)) or []
+            cached_data = _apply_last_down_from_history(cached_data)
             return cached_data
 
     try:
@@ -383,15 +403,7 @@ def get_onu_full_info(
         result["annotation"] = _annotation_dict(_get_annotation(db, olt_id, slot, card, pon, onu_id))
         result["signal_history"] = _record_signal_history(olt_id, slot, card, pon, onu_id, result)
 
-        detail = result.get("detail") or {}
-        history = detail.get("history") or []
-        if history and not detail.get("last_down_cause"):
-            last_event = history[-1]
-            detail["last_down_cause"] = last_event.get("cause")
-            detail["last_offline_time"] = last_event.get("offline_time")
-        if result.get("status") and result["status"].get("last_down_cause") and not detail.get("last_down_cause"):
-            detail["last_down_cause"] = result["status"].get("last_down_cause")
-        result["detail"] = detail
+        result = _apply_last_down_from_history(result)
 
         cache.set(cache_key, result)
         return result

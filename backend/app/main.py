@@ -312,6 +312,45 @@ write"""
 
 
         try:
+            router_commands = """configure terminal
+interface gpon_olt-[*PORT_NAME]
+onu [*ONU_NUMBER] type [*ONU_TYPE] SN [ONU_SERIAL]
+exit
+interface gpon_onu-[*PORT_NAME]:[*ONU_NUMBER]
+name FND_TEXT([*CLI_NOME])
+tcont 4 profile default
+gemport 1 tcont 4
+exit
+interface vport-[*PORT_NAME].[*ONU_NUMBER]:1
+service-port 1 user-vlan [*PORT_VLAN] vlan [*PORT_VLAN]
+exit
+pon-onu-mng gpon_onu-[*PORT_NAME]:[*ONU_NUMBER]
+service 1 gemport 1 vlan [*PORT_VLAN]
+vlan port eth_0/1 mode tag vlan [*PORT_VLAN]
+end
+write"""
+            conn.execute(
+                sa.text(
+                    "INSERT INTO provision_templates "
+                    "(name, model_alias, vlan, onu_type, start_onu_number, commands, is_active) "
+                    "SELECT :name, :model_alias, :vlan, :onu_type, :start_onu_number, :commands, 1 "
+                    "WHERE NOT EXISTS (SELECT 1 FROM provision_templates WHERE lower(name) = lower(:name))"
+                ),
+                {
+                    "name": "Router",
+                    "model_alias": "Router",
+                    "vlan": 1,
+                    "onu_type": "ZTE-F601",
+                    "start_onu_number": 1,
+                    "commands": router_commands,
+                },
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"Router provision template seed: {e}")
+
+
+        try:
             conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS onu_annotations (
                     id INTEGER PRIMARY KEY,

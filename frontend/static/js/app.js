@@ -900,6 +900,26 @@ end
 write`;
     },
 
+    defaultRouterProvisionCommands() {
+      return `configure terminal
+interface gpon_olt-[*PORT_NAME]
+onu [*ONU_NUMBER] type [*ONU_TYPE] SN [ONU_SERIAL]
+exit
+interface gpon_onu-[*PORT_NAME]:[*ONU_NUMBER]
+name FND_TEXT([*CLI_NOME])
+tcont 4 profile default
+gemport 1 tcont 4
+exit
+interface vport-[*PORT_NAME].[*ONU_NUMBER]:1
+service-port 1 user-vlan [*PORT_VLAN] vlan [*PORT_VLAN]
+exit
+pon-onu-mng gpon_onu-[*PORT_NAME]:[*ONU_NUMBER]
+service 1 gemport 1 vlan [*PORT_VLAN]
+vlan port eth_0/1 mode tag vlan [*PORT_VLAN]
+end
+write`;
+    },
+
     async loadProvisionTemplates() {
       try {
         const res = await this.apiGet('/onus/provision-templates');
@@ -910,16 +930,17 @@ write`;
       } catch (e) {}
     },
 
-    openProvisionTemplateModal(tpl = null) {
+    openProvisionTemplateModal(tpl = null, profile = 'bridge') {
       this.provisionTemplateEditId = tpl ? tpl.id : null;
+      const isRouter = profile === 'router';
       this.provisionTemplateForm = tpl ? { ...tpl } : {
-        name: 'Bridge',
-        model_alias: 'ZTE-F601',
+        name: isRouter ? 'Router' : 'Bridge',
+        model_alias: isRouter ? 'Router' : 'ZTE-F601',
         vlan: 1,
         onu_type: 'ZTE-F601',
         start_onu_number: 1,
         is_active: true,
-        commands: this.defaultProvisionCommands(),
+        commands: isRouter ? this.defaultRouterProvisionCommands() : this.defaultProvisionCommands(),
       };
       this.provisionTemplateModal = true;
     },

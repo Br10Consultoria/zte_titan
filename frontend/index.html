@@ -1873,7 +1873,11 @@
     <div class="modal modal-lg" style="max-width:980px">
       <div class="modal-header">
         <div class="modal-title"><i class="fas fa-file-code"></i> <span x-text="provisionTemplateEditId ? 'Editar Template' : 'Novo Template'"></span></div>
-        <button @click="provisionTemplateModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button @click="openProvisionTemplateModal(null, 'bridge')" class="btn btn-ghost btn-xs"><i class="fas fa-plus"></i> Bridge</button>
+          <button @click="openProvisionTemplateModal(null, 'router')" class="btn btn-ghost btn-xs"><i class="fas fa-plus"></i> Router</button>
+          <button @click="provisionTemplateModal=false" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
         <div><label class="form-label">Nome</label><input x-model="provisionTemplateForm.name" class="input-field" /></div>
@@ -2025,7 +2029,7 @@
               <div class="detail-item"><div class="detail-label">ONU Status</div><div class="detail-value" x-text="onuDetailData.detail.onu_status || '-' "></div></div>
               <div class="detail-item"><div class="detail-label">Distancia</div><div class="detail-value mono" style="color:#56d364" x-text="onuDetailData.detail.distance ? onuDetailData.detail.distance + ' m' : '-' "></div></div>
               <div class="detail-item"><div class="detail-label">Tempo Online</div><div class="detail-value" x-text="onuDetailData.detail.online_duration || '-' "></div></div>
-              <div class="detail-item"><div class="detail-label">Ultima Queda</div><div class="detail-value" x-text="onuDetailData.detail.last_down_cause || onuDetailData.status?.last_down_cause || '-' "></div></div>
+              <div class="detail-item"><div class="detail-label">Ultima Queda</div><div class="detail-value" x-text="onuDetailData.detail.last_offline_time ? `${onuDetailData.detail.last_offline_time} - ${onuDetailData.detail.last_down_cause || '-'}` : (onuDetailData.detail.last_down_cause || onuDetailData.status?.last_down_cause || '-') "></div></div>
               <div class="detail-item"><div class="detail-label">Firmware CPE</div><div class="detail-value mono" x-text="onuDetailData.detail.firmware_version || onuDetailData.equipment?.version || '-' "></div></div>
               <div class="detail-item"><div class="detail-label">SFP Vendor</div><div class="detail-value" x-text="onuDetailData.sfp_pon?.vendor || '-' "></div></div>
               <div class="detail-item"><div class="detail-label">SFP Classe</div><div class="detail-value" x-text="onuDetailData.sfp_pon?.module_class || '-' "></div></div>
@@ -2050,7 +2054,7 @@
               <div class="detail-item"><div class="detail-label">Índice</div><div class="detail-value mono" x-text="onuDetailData.status.onu_index"></div></div>
               <div class="detail-item"><div class="detail-label">Admin State</div><div class="detail-value"><span :class="onuDetailData.status.admin_state==='enable'?'badge badge-green':'badge badge-red'" x-text="onuDetailData.status.admin_state"></span></div></div>
               <div class="detail-item"><div class="detail-label">Oper State</div><div class="detail-value"><span :class="onuDetailData.status.oper_state==='working'?'badge badge-green':onuDetailData.status.oper_state==='disable'?'badge badge-red':'badge badge-yellow'" x-text="onuDetailData.status.oper_state"></span></div></div>
-              <div class="detail-item"><div class="detail-label">Última Queda</div><div class="detail-value" x-text="onuDetailData.status.last_down_cause || '—'"></div></div>
+              <div class="detail-item"><div class="detail-label">Ultima Queda</div><div class="detail-value" x-text="onuDetailData.detail?.last_offline_time ? `${onuDetailData.detail.last_offline_time} - ${onuDetailData.detail.last_down_cause || '-'}` : (onuDetailData.detail?.last_down_cause || onuDetailData.status.last_down_cause || '-')"></div></div>
             </div>
           </template>
           <div x-show="!onuDetailData || !onuDetailData.status" class="empty-state" style="padding:24px"><i class="fas fa-signal" style="font-size:24px"></i><p>Dados não disponíveis.</p></div>
