@@ -743,7 +743,7 @@ def parse_onu_power(output: str, onu_index: str) -> Dict:
             result["olt_rx_power"] = rx_olt
             if rx_olt >= -27:
                 result["olt_rx_status"] = "normal"
-            elif rx_olt >= -29:
+            elif rx_olt > -29:
                 result["olt_rx_status"] = "warning"
             else:
                 result["olt_rx_status"] = "critical"
@@ -779,7 +779,7 @@ def parse_onu_power(output: str, onu_index: str) -> Dict:
             if onu_rx >= -27:
                 result["onu_rx_status"] = "normal"
                 result["rx_status"] = "normal"
-            elif onu_rx >= -29:
+            elif onu_rx > -29:
                 result["onu_rx_status"] = "warning"
                 result["rx_status"] = "warning"
             else:

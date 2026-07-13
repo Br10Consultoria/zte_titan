@@ -53,6 +53,7 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
         logger.warning(f"[CACHE] Falha RX OLT {iface}: {exc}")
 
     detail_map = {}
+    power_map = {}
     if include_details:
         for onu_item in onus:
             idx = onu_item["onu_index"]
@@ -63,6 +64,12 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
             except Exception as exc:
                 logger.warning(f"[CACHE] Falha detail-info {onu_iface}: {exc}")
                 detail_map[idx] = {}
+            try:
+                power_out = client.execute_command(driver.cmd_onu_power(onu_iface), timeout=10)
+                power_map[idx] = driver.parse_onu_power(power_out)
+            except Exception as exc:
+                logger.warning(f"[CACHE] Falha power {onu_iface}: {exc}")
+                power_map[idx] = {}
 
     for onu in onus:
         idx = onu["onu_index"]
@@ -72,13 +79,19 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
         onu["model"] = base.get("model", "")
         onu["description"] = detail.get("description", "")
         onu["online_duration"] = detail.get("online_duration", "")
+        power = power_map.get(idx, {})
+        if power:
+            onu["rx_power"] = power.get("rx_power")
+            onu["onu_rx_power"] = power.get("rx_power")
+            onu["rx_status"] = power.get("rx_status")
+            onu["tx_power"] = power.get("tx_power")
 
         rx_val = rx_map.get(idx)
         if rx_val is not None:
             onu["olt_rx_power"] = rx_val
-            if rx_val >= -25:
+            if rx_val >= -27:
                 onu["olt_rx_status"] = "normal"
-            elif rx_val >= -28:
+            elif rx_val > -29:
                 onu["olt_rx_status"] = "warning"
             else:
                 onu["olt_rx_status"] = "critical"

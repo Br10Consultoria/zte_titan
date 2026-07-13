@@ -127,6 +127,43 @@ def _apply_last_down_from_history(result: dict) -> dict:
     return result
 
 
+def _signal_status(value):
+    if value is None:
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    if value >= -27:
+        return "normal"
+    if value > -29:
+        return "warning"
+    return "critical"
+
+
+def _enrich_pon_status_from_detail_cache(olt_id: int, slot: int, card: int, pon: int, result: dict) -> dict:
+    for onu in result.get("onus") or []:
+        onu_id = str(onu.get("onu_index") or "").split(":")[-1]
+        if not onu_id:
+            continue
+        full = cache.get(f"olt:{olt_id}:onu:{slot}:{card}:{pon}:{onu_id}:full")
+        if not full:
+            continue
+        detail = full.get("detail") or {}
+        power = full.get("power") or {}
+        onu["description"] = onu.get("description") or detail.get("description") or ""
+        onu["online_duration"] = onu.get("online_duration") or detail.get("online_duration") or ""
+        if onu.get("rx_power") is None:
+            onu["rx_power"] = power.get("rx_power") if power.get("rx_power") is not None else power.get("onu_rx_power")
+        if onu.get("onu_rx_power") is None:
+            onu["onu_rx_power"] = onu.get("rx_power")
+        if not onu.get("rx_status"):
+            onu["rx_status"] = power.get("rx_status") or power.get("onu_rx_status") or _signal_status(onu.get("rx_power"))
+        if onu.get("tx_power") is None:
+            onu["tx_power"] = power.get("tx_power") if power.get("tx_power") is not None else power.get("onu_tx_power")
+    return result
+
+
 def _template_dict(tpl: ProvisionTemplate) -> dict:
     return {
         "id": tpl.id,
@@ -320,6 +357,7 @@ def get_pon_status(
             cached_data["cached"] = True
             cache_info = cache.get_cache_info(cache_key)
             cached_data["cache_expires_in"] = cache_info.get("expires_in")
+            cached_data = _enrich_pon_status_from_detail_cache(olt_id, slot, card, pon, cached_data)
             return cached_data
 
     iface = driver.olt_iface(slot, card, pon)
@@ -334,6 +372,7 @@ def get_pon_status(
             port_obj = OLTPort(olt_id=olt_id, slot=slot, card=card, pon=pon)
 
         result = collect_pon_status(client, driver, olt, port_obj, include_details=True)
+        result = _enrich_pon_status_from_detail_cache(olt_id, slot, card, pon, result)
         # Atualiza contagem na porta
         if port_obj:
             port_obj.onu_count = result["total"]

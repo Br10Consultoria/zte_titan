@@ -44,6 +44,7 @@ function app() {
     onuLoading: false,
     onuSearch: '',
     onuStateFilter: '',
+    onuSort: { field: 'onu_index', dir: 'asc' },
 
     // ONU Detail
     onuDetailModal: false,
@@ -569,6 +570,31 @@ function app() {
       }
     },
 
+    sortONUs(field) {
+      if (this.onuSort.field === field) {
+        this.onuSort.dir = this.onuSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.onuSort = { field, dir: 'asc' };
+      }
+    },
+
+    sortIcon(field) {
+      if (this.onuSort.field !== field) return 'fas fa-sort';
+      return this.onuSort.dir === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+    },
+
+    onuSortValue(onu, field) {
+      if (field === 'rx_power' || field === 'olt_rx_power') {
+        const v = onu[field];
+        return v === null || v === undefined ? Number.POSITIVE_INFINITY : Number(v);
+      }
+      if (field === 'onu_index') {
+        return String(onu.onu_index || '').split(/[/:]/).map(n => String(n).padStart(4, '0')).join('/');
+      }
+      if (field === 'model') return (onu.onu_type || onu.model || '').toLowerCase();
+      return String(onu[field] || '').toLowerCase();
+    },
+
     get filteredONUs() {
       if (!this.onuStatusData) return [];
       let list = this.onuStatusData.onus || [];
@@ -586,15 +612,24 @@ function app() {
       if (this.onuStateFilter) {
         const f = this.onuStateFilter.toLowerCase();
         if (f === 'rx_ruim') {
-          // Filtro especial: sinal óptico ruim (RX OLT abaixo de -28 dBm)
-          list = list.filter(o => o.olt_rx_power !== null && o.olt_rx_power !== undefined && o.olt_rx_power < -28);
+          list = list.filter(o =>
+            (o.olt_rx_power !== null && o.olt_rx_power !== undefined && o.olt_rx_power <= -29) ||
+            (o.rx_power !== null && o.rx_power !== undefined && o.rx_power <= -29)
+          );
         } else {
           list = list.filter(o => (o.oper_state || '').toLowerCase() === f ||
             (o.phase_state || '').toLowerCase() === f ||
             (o.last_down_cause || '').toLowerCase() === f);
         }
       }
-      return list;
+      const dir = this.onuSort.dir === 'desc' ? -1 : 1;
+      const field = this.onuSort.field;
+      return [...list].sort((a, b) => {
+        const av = this.onuSortValue(a, field);
+        const bv = this.onuSortValue(b, field);
+        if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+        return String(av).localeCompare(String(bv), 'pt-BR', { numeric: true }) * dir;
+      });
     },
 
     closeONUDetail() {

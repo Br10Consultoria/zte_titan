@@ -472,9 +472,9 @@ class ZTEC600Driver(OLTDriver):
         # Status de sinal
         rx = result.get("rx_power")
         if rx is not None:
-            if rx >= -25:
+            if rx >= -27:
                 result["rx_status"] = "normal"
-            elif rx >= -28:
+            elif rx > -29:
                 result["rx_status"] = "warning"
             else:
                 result["rx_status"] = "critical"

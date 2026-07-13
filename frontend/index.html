@@ -853,7 +853,7 @@
               <span class="legend-label">PowerOff</span>
               <span class="legend-desc">Desligada</span>
             </div>
-            <div class="legend-row" title="Sinal óptico fraco (RX OLT abaixo de -28 dBm)">
+            <div class="legend-row" title="Sinal optico critico (RX <= -29 dBm)">
               <span class="legend-dot" style="background:linear-gradient(135deg,#ff7b72,#e3b341)"></span>
               <span class="legend-label">RX &lt; -28</span>
               <span class="legend-desc">Sinal ruim</span>
@@ -1323,7 +1323,7 @@
                   <option value="disable">⚫ disable — Desabilitada</option>
                 </optgroup>
                 <optgroup label="Sinal Óptico">
-                  <option value="rx_ruim">📡 RX abaixo de -28 dBm — Sinal ruim</option>
+                  <option value="rx_ruim">RX <= -29 dBm - Sinal critico</option>
                 </optgroup>
               </select>
               <button @click="printONUTable()" class="btn btn-ghost btn-sm"><i class="fas fa-print mr-1"></i>Imprimir</button>
@@ -1339,10 +1339,21 @@
             </div>
 
             <div x-show="onuStatusData && !onuLoading" class="card" id="onu-table">
-              <div class="table-wrap">
-                <table>
+              <div class="table-wrap" style="max-height:58vh;overflow:auto">
+                <table style="min-width:1120px">
                   <thead>
-                    <tr><th>Índice ONU</th><th>Serial</th><th>Tipo/Modelo</th><th>Descrição</th><th>Admin</th><th>Estado</th><th>Uptime</th><th>RX OLT</th><th>Ações</th></tr>
+                    <tr>
+                      <th @click="sortONUs('onu_index')" style="cursor:pointer">Indice ONU <i :class="sortIcon('onu_index')"></i></th>
+                      <th @click="sortONUs('serial')" style="cursor:pointer">Serial <i :class="sortIcon('serial')"></i></th>
+                      <th @click="sortONUs('model')" style="cursor:pointer">Tipo/Modelo <i :class="sortIcon('model')"></i></th>
+                      <th @click="sortONUs('description')" style="cursor:pointer">Descricao <i :class="sortIcon('description')"></i></th>
+                      <th @click="sortONUs('admin_state')" style="cursor:pointer">Admin <i :class="sortIcon('admin_state')"></i></th>
+                      <th @click="sortONUs('oper_state')" style="cursor:pointer">Estado <i :class="sortIcon('oper_state')"></i></th>
+                      <th @click="sortONUs('online_duration')" style="cursor:pointer">Uptime <i :class="sortIcon('online_duration')"></i></th>
+                      <th @click="sortONUs('rx_power')" style="cursor:pointer">RX ONU <i :class="sortIcon('rx_power')"></i></th>
+                      <th @click="sortONUs('olt_rx_power')" style="cursor:pointer">RX OLT <i :class="sortIcon('olt_rx_power')"></i></th>
+                      <th>Acoes</th>
+                    </tr>
                   </thead>
                   <tbody>
                     <template x-for="onu in filteredONUs" :key="onu.onu_index">
@@ -1366,9 +1377,23 @@
                           <span x-show="!onu.online_duration" style="color:var(--text-muted)">—</span>
                         </td>
                         <td>
+                          <template x-if="onu.rx_power !== null && onu.rx_power !== undefined">
+                            <span style="display:inline-flex;align-items:center;gap:5px"
+                                  :title="'RX ONU: ' + onu.rx_power.toFixed(3) + ' dBm\n' + (onu.rx_status==='normal'?'Sinal normal (>= -27 dBm)':onu.rx_status==='warning'?'Sinal em atencao (> -29 dBm)':'Sinal critico (<= -29 dBm)')">
+                              <span class="power-dot" :class="onu.rx_status==='normal'?'power-normal':onu.rx_status==='warning'?'power-warning':'power-critical'"></span>
+                              <span class="td-mono"
+                                    :style="onu.rx_status==='critical'?'color:#ff7b72':onu.rx_status==='warning'?'color:#e3b341':'color:#56d364'"
+                                    x-text="onu.rx_power.toFixed(2) + ' dBm'"></span>
+                            </span>
+                          </template>
+                          <template x-if="onu.rx_power === null || onu.rx_power === undefined">
+                            <span style="color:var(--text-muted)">-</span>
+                          </template>
+                        </td>
+                        <td>
                           <template x-if="onu.olt_rx_power !== null && onu.olt_rx_power !== undefined">
                             <span style="display:inline-flex;align-items:center;gap:5px"
-                                  :title="'RX OLT: ' + (onu.olt_rx_power ? onu.olt_rx_power.toFixed(3) : '') + ' dBm\n' + (onu.olt_rx_status==='normal'?'Sinal normal (> -25 dBm)':onu.olt_rx_status==='warning'?'Sinal fraco (-25 a -28 dBm)':'Sinal cr\u00edtico (< -28 dBm)')">
+                                  :title="'RX OLT: ' + onu.olt_rx_power.toFixed(3) + ' dBm\n' + (onu.olt_rx_status==='normal'?'Sinal normal (>= -27 dBm)':onu.olt_rx_status==='warning'?'Sinal em atencao (> -29 dBm)':'Sinal critico (<= -29 dBm)')">
                               <span class="power-dot" :class="onu.olt_rx_status==='normal'?'power-normal':onu.olt_rx_status==='warning'?'power-warning':'power-critical'"></span>
                               <span class="td-mono"
                                     :style="onu.olt_rx_status==='critical'?'color:#ff7b72':onu.olt_rx_status==='warning'?'color:#e3b341':'color:#56d364'"
@@ -1376,7 +1401,7 @@
                             </span>
                           </template>
                           <template x-if="onu.olt_rx_power === null || onu.olt_rx_power === undefined">
-                            <span style="color:var(--text-muted)">—</span>
+                            <span style="color:var(--text-muted)">-</span>
                           </template>
                         </td>
                         <td>
@@ -1394,7 +1419,7 @@
                       </tr>
                     </template>
                     <tr x-show="filteredONUs.length === 0 && onuStatusData">
-                      <td colspan="9"><div class="empty-state" style="padding:28px"><i class="fas fa-network-wired"></i><p>Nenhuma ONU encontrada com os filtros aplicados.</p></div></td>
+                      <td colspan="10"><div class="empty-state" style="padding:28px"><i class="fas fa-network-wired"></i><p>Nenhuma ONU encontrada com os filtros aplicados.</p></div></td>
                     </tr>
                   </tbody>
                 </table>
