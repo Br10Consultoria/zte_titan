@@ -1057,6 +1057,16 @@
               </div>
             </div>
 
+            <div x-show="dashboardAnalyticsError" class="cache-bar">
+              <i class="fas fa-triangle-exclamation"></i>
+              <span x-text="dashboardAnalyticsError"></span>
+            </div>
+
+            <div x-show="dashboardAnalytics && dashboardAnalytics.summary && dashboardAnalytics.summary.total_ports > 0 && dashboardAnalytics.summary.cached_onus === 0" class="cache-bar">
+              <i class="fas fa-database"></i>
+              <span>Graficos de sinal, estado, modelo e firmware aparecem depois de atualizar o status da OLT e preencher o cache Redis.</span>
+            </div>
+
             <div class="card">
               <div class="card-header">
                 <span><i class="fas fa-server mr-2" style="color:var(--accent)"></i>OLTs Cadastradas</span>
@@ -1080,6 +1090,10 @@
                         <td>
                           <div style="display:flex;gap:4px">
                             <button @click="testOLTConnection(olt)" class="btn btn-ghost btn-xs" title="Testar Conexão"><i class="fas fa-plug"></i></button>
+                            <template x-if="currentUser && currentUser.role === 'admin'">
+                              <button @click="discoverOLT(olt)" class="btn btn-warning btn-xs" title="Descobrir portas"><i class="fas fa-magnifying-glass"></i></button>
+                            </template>
+                            <button @click="refreshOLTStatus(olt)" class="btn btn-warning btn-xs" title="Atualizar status e alimentar cache"><i class="fas fa-rotate-right"></i></button>
                             <button @click="openONUPage(olt)" class="btn btn-primary btn-xs"><i class="fas fa-network-wired mr-1"></i>Ver ONUs</button>
                           </div>
                         </td>

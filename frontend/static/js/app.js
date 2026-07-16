@@ -131,6 +131,7 @@ function app() {
     // Stats
     stats: {},
     dashboardAnalytics: null,
+    dashboardAnalyticsError: '',
     dashboardDrilldown: { show: false, type: '', label: '', value: '', rows: [] },
 
     // ============================================================
@@ -315,6 +316,7 @@ function app() {
     // ============================================================
     async loadDashboard() {
       await this.loadOLTs();
+      this.dashboardAnalyticsError = '';
       // Health check
       try {
         const res = await fetch(`${API_BASE}/health`);
@@ -328,8 +330,15 @@ function app() {
         if (res.ok) {
           this.dashboardAnalytics = await this.safeJson(res);
           this.stats.total_ports = this.dashboardAnalytics.summary.total_ports || 0;
+        } else {
+          const data = await this.safeJson(res);
+          this.dashboardAnalytics = null;
+          this.dashboardAnalyticsError = data.detail || 'Nao foi possivel carregar os graficos.';
         }
-      } catch (e) {}
+      } catch (e) {
+        this.dashboardAnalytics = null;
+        this.dashboardAnalyticsError = e.message || 'Nao foi possivel carregar os graficos.';
+      }
     },
 
     chartMax(items) {
@@ -475,6 +484,7 @@ function app() {
         if (!res.ok) throw new Error(data.detail || 'Erro na descoberta');
         this.showToast(`✅ ${data.message}`, 'success');
         await this.loadOLTs();
+        await this.loadDashboard();
       } catch (e) {
         this.showToast(e.message, 'error');
       }
@@ -489,7 +499,10 @@ function app() {
         this.showToast(data.message || 'Atualizacao iniciada!', 'success');
         setTimeout(() => {
           if (this.selectedOLTForPorts && this.selectedOLTForPorts.id === olt.id) this.loadOLTPorts(olt);
+          this.loadDashboard();
         }, 5000);
+        setTimeout(() => this.loadDashboard(), 30000);
+        setTimeout(() => this.loadDashboard(), 90000);
       } catch (e) {
         this.showToast(e.message, 'error');
       }
