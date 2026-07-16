@@ -387,6 +387,138 @@ function app() {
       this.dashboardDrilldown = { show: false, type: '', label: '', value: '', rows: [] };
     },
 
+    dashboardDrilldownReportTitle() {
+      return this.dashboardDrilldownTitle(this.dashboardDrilldown.type, this.dashboardDrilldown.label);
+    },
+
+    dashboardDrilldownReportRows() {
+      return (this.dashboardDrilldown.rows || []).map(row => ({
+        olt: row.olt || '',
+        pon: row.pon_label || '',
+        onu: row.onu_index || '',
+        serial: row.serial || '',
+        modelo: row.model || '',
+        sinal: `${this.signalLabel(row.signal_status)}${row.rx_power !== null && row.rx_power !== undefined ? ` (${Number(row.rx_power).toFixed(2)} dBm)` : ''}`,
+        estado: row.oper_state || '',
+        firmware: row.firmware || '',
+      }));
+    },
+
+    dashboardDrilldownFileName(ext) {
+      const base = this.dashboardDrilldownReportTitle()
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'relatorio-onus';
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      return `${base}-${stamp}.${ext}`;
+    },
+
+    escapeCsv(value) {
+      const text = String(value ?? '');
+      return `"${text.replace(/"/g, '""')}"`;
+    },
+
+    downloadBlob(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+
+    dashboardDrilldownReportHtml() {
+      const title = this.dashboardDrilldownReportTitle();
+      const rows = this.dashboardDrilldownReportRows();
+      const generatedAt = new Date().toLocaleString('pt-BR');
+      const bodyRows = rows.map(row => `
+        <tr>
+          <td>${this.escapeHtml(row.olt)}</td>
+          <td>${this.escapeHtml(row.pon)}</td>
+          <td>${this.escapeHtml(row.onu)}</td>
+          <td>${this.escapeHtml(row.serial)}</td>
+          <td>${this.escapeHtml(row.modelo)}</td>
+          <td>${this.escapeHtml(row.sinal)}</td>
+          <td>${this.escapeHtml(row.estado)}</td>
+          <td>${this.escapeHtml(row.firmware)}</td>
+        </tr>
+      `).join('');
+      return `
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>${this.escapeHtml(title)}</title>
+            <style>
+              body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+              h1 { font-size: 20px; margin: 0 0 6px; }
+              .meta { color: #4b5563; font-size: 12px; margin-bottom: 18px; }
+              table { width: 100%; border-collapse: collapse; font-size: 11px; }
+              th { text-align: left; background: #e5eefc; color: #1f4b85; }
+              th, td { border: 1px solid #c8d7ee; padding: 7px 8px; vertical-align: top; }
+              tr:nth-child(even) { background: #f8fbff; }
+              @media print { body { margin: 10mm; } }
+            </style>
+          </head>
+          <body>
+            <h1>${this.escapeHtml(title)}</h1>
+            <div class="meta">Total: ${rows.length} | Gerado em: ${this.escapeHtml(generatedAt)}</div>
+            <table>
+              <thead><tr><th>OLT</th><th>PON</th><th>ONU</th><th>Serial</th><th>Modelo</th><th>Sinal</th><th>Estado</th><th>Firmware</th></tr></thead>
+              <tbody>${bodyRows || '<tr><td colspan="8">Nenhuma ONU encontrada.</td></tr>'}</tbody>
+            </table>
+          </body>
+        </html>
+      `;
+    },
+
+    printDashboardDrilldown() {
+      const win = window.open('', '_blank', 'width=1100,height=800');
+      if (!win) {
+        this.showToast('Pop-up bloqueado pelo navegador', 'error');
+        return;
+      }
+      win.document.write(this.dashboardDrilldownReportHtml());
+      win.document.close();
+      win.focus();
+      win.print();
+    },
+
+    downloadDashboardDrilldownHtml() {
+      this.downloadBlob(
+        this.dashboardDrilldownFileName('html'),
+        this.dashboardDrilldownReportHtml(),
+        'text/html;charset=utf-8'
+      );
+    },
+
+    downloadDashboardDrilldownCsv() {
+      const rows = this.dashboardDrilldownReportRows();
+      const headers = ['OLT', 'PON', 'ONU', 'Serial', 'Modelo', 'Sinal', 'Estado', 'Firmware'];
+      const lines = [
+        headers.map(h => this.escapeCsv(h)).join(';'),
+        ...rows.map(row => [
+          row.olt,
+          row.pon,
+          row.onu,
+          row.serial,
+          row.modelo,
+          row.sinal,
+          row.estado,
+          row.firmware,
+        ].map(v => this.escapeCsv(v)).join(';'))
+      ];
+      this.downloadBlob(
+        this.dashboardDrilldownFileName('csv'),
+        `\ufeff${lines.join('\n')}`,
+        'text/csv;charset=utf-8'
+      );
+    },
+
     openONUDetailFromDashboard(row) {
       const onuId = String(row.onu_index || '').split(':').pop();
       if (!onuId) return;

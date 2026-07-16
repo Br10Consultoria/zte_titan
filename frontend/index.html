@@ -1874,7 +1874,12 @@
           <span x-text="dashboardDrilldownTitle(dashboardDrilldown.type, dashboardDrilldown.label)"></span>
           <span class="badge badge-blue" x-text="dashboardDrilldown.rows.length"></span>
         </div>
-        <button @click="closeDashboardDrilldown()" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button @click="downloadDashboardDrilldownCsv()" class="btn btn-ghost btn-xs" title="Baixar CSV"><i class="fas fa-file-csv"></i> CSV</button>
+          <button @click="printDashboardDrilldown()" class="btn btn-ghost btn-xs" title="Imprimir ou salvar PDF"><i class="fas fa-print"></i> Imprimir</button>
+          <button @click="downloadDashboardDrilldownHtml()" class="btn btn-ghost btn-xs" title="Salvar relatorio HTML"><i class="fas fa-download"></i> HTML</button>
+          <button @click="closeDashboardDrilldown()" class="btn btn-ghost btn-xs"><i class="fas fa-times"></i></button>
+        </div>
       </div>
       <div class="table-wrap" style="max-height:62vh;overflow:auto">
         <table>
