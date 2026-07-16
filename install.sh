@@ -98,21 +98,30 @@ ok "Ambiente virtual criado em $VENV_DIR"
 info "Instalando dependências Python (pode demorar alguns minutos)..."
 "$VENV_DIR/bin/pip" install --quiet --upgrade pip setuptools wheel
 
-# Instala dependências sem versões fixas para compatibilidade com Python 3.13+
-"$VENV_DIR/bin/pip" install --quiet \
-    "fastapi" \
-    "uvicorn[standard]" \
-    "sqlalchemy" \
-    "python-jose[cryptography]" \
-    "bcrypt>=4.2.0" \
-    "python-multipart" \
-    "pyotp" \
-    "qrcode[pil]" \
-    "redis" \
-    "paramiko" \
-    "aiofiles" \
-    "python-dotenv" \
-    "Pillow"
+# Instala as mesmas dependências usadas no Docker para evitar divergência
+# entre ambientes systemd/venv e container.
+if [ -f "$APP_DIR/backend/requirements.txt" ]; then
+    "$VENV_DIR/bin/pip" install --quiet -r "$APP_DIR/backend/requirements.txt"
+else
+    "$VENV_DIR/bin/pip" install --quiet \
+        "fastapi" \
+        "uvicorn[standard]" \
+        "sqlalchemy" \
+        "alembic" \
+        "python-jose[cryptography]" \
+        "bcrypt>=4.2.0" \
+        "python-multipart" \
+        "pyotp" \
+        "qrcode[pil]" \
+        "redis" \
+        "paramiko" \
+        "aiofiles" \
+        "httpx" \
+        "pyftpdlib" \
+        "python-dotenv" \
+        "Pillow" \
+        "pytz"
+fi
 ok "Dependências Python instaladas"
 
 # ============================================================
