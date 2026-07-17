@@ -1,4 +1,7 @@
 from collections import Counter
+from datetime import datetime
+
+import psutil
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -10,6 +13,32 @@ from ..olt_status_cache import pon_status_cache_key
 from ..redis_client import cache
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+
+@router.get("/system")
+def dashboard_system_metrics(current_user: User = Depends(get_current_user)):
+    """Retorna métricas somente leitura do servidor que executa a aplicação."""
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    now = datetime.now().astimezone()
+    uptime_seconds = max(0, int(now.timestamp() - psutil.boot_time()))
+    return {
+        "server_time": now.isoformat(),
+        "cpu_percent": round(psutil.cpu_percent(interval=0.1), 1),
+        "memory": {
+            "percent": round(memory.percent, 1),
+            "used": memory.used,
+            "available": memory.available,
+            "total": memory.total,
+        },
+        "disk": {
+            "percent": round(disk.percent, 1),
+            "used": disk.used,
+            "free": disk.free,
+            "total": disk.total,
+        },
+        "uptime_seconds": uptime_seconds,
+    }
 
 
 def _label_pon(olt: OLT, port: OLTPort) -> str:

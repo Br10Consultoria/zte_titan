@@ -785,12 +785,25 @@
     .login-card .form-label { color: #38566b; }
     .login-card .input-field { background: #fff; color: #163047; border-color: #d8e4ea; }
     .theme-toggle { background: #f7fafb; color: #577184; }
+    .sidebar-logo .logo-icon { width: 82px; height: 50px; }
+    .sidebar-logo .logo-icon img { width: 82px; height: 50px; object-fit: contain; }
+    .topbar-brand-logo { width: 82px; height: 38px; object-fit: contain; flex-shrink: 0; }
+    .topbar-system { display:flex;align-items:center;gap:6px;min-width:0;margin-left:8px;flex:1;overflow-x:auto; }
+    .system-chip { display:inline-flex;align-items:center;gap:5px;min-height:28px;padding:4px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg-surface);color:var(--text-secondary);font-size:10.5px;white-space:nowrap; }
+    .system-chip i { color: var(--accent); }
+    .system-chip strong { color: var(--text-primary); font-weight:700; }
+    .metric-track { height:8px;background:#163b55;border-radius:4px;overflow:hidden; }
+    body.light-theme .metric-track { background:#d8e4ea; }
 
     @media (max-width: 900px) {
       .sidebar-logo { min-height: var(--topbar-h); }
       .sidebar-logo .logo-icon,
       .sidebar-logo .logo-icon img { width: 42px; height: 42px; }
+      .topbar-brand-logo { display:none; }
+      .topbar-system { overflow-x:auto; }
+      .system-chip { padding:4px 6px; }
     }
+    @media (max-width: 700px) { .topbar-system { display:none; } }
   </style>
 </head>
 <body>
@@ -1014,9 +1027,19 @@
         <button @click="sidebarCollapsed=!sidebarCollapsed" class="btn btn-ghost btn-icon" title="Recolher menu">
           <i class="fas fa-bars"></i>
         </button>
+        <template x-if="logoExists">
+          <img :src="logoSrc" alt="BR10 Network Solutions" class="topbar-brand-logo" />
+        </template>
         <div class="topbar-title">
           <i :class="page==='dashboard'?'fas fa-gauge-high':page==='olts'?'fas fa-server':page==='onus'?'fas fa-network-wired':page==='uncfg'?'fas fa-circle-exclamation':page==='search'?'fas fa-magnifying-glass':page==='backups'?'fas fa-cloud-arrow-up':page==='users'?'fas fa-users':'fas fa-user-gear'"></i>
           <span x-text="page==='dashboard'?'Dashboard':page==='olts'?'Gerenciamento de OLTs':page==='onus'?'Status das ONUs':page==='uncfg'?'ONUs Não Provisionadas':page==='search'?'Buscar ONU por Serial':page==='backups'?'Backups de OLT':page==='users'?'Gerenciamento de Usuários':'Meu Perfil'"></span>
+        </div>
+        <div class="topbar-system" x-show="page === 'dashboard'">
+          <span class="system-chip" title="Data e hora do servidor"><i class="fas fa-clock"></i><strong x-text="serverDateTime || '—'"></strong></span>
+          <span class="system-chip" title="Uso de CPU"><i class="fas fa-microchip"></i>CPU <strong x-text="stats.system ? stats.system.cpu_percent + '%' : '—'"></strong></span>
+          <span class="system-chip" title="Memória em uso e disponível"><i class="fas fa-memory"></i>RAM <strong x-text="stats.system ? formatSystemBytes(stats.system.memory.used) + ' / ' + formatSystemBytes(stats.system.memory.available) + ' disp.' : '—'"></strong></span>
+          <span class="system-chip" title="Disco em uso e disponível"><i class="fas fa-hard-drive"></i>Disco <strong x-text="stats.system ? formatSystemBytes(stats.system.disk.used) + ' / ' + formatSystemBytes(stats.system.disk.free) + ' disp.' : '—'"></strong></span>
+          <span class="system-chip" title="Tempo ligado do servidor"><i class="fas fa-stopwatch"></i>Uptime <strong x-text="stats.system ? formatUptime(stats.system.uptime_seconds) : '—'"></strong></span>
         </div>
         <div class="topbar-actions">
           <span style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px">
@@ -1078,7 +1101,7 @@
                         <span class="td-mono" x-text="p.label"></span>
                         <span x-text="`${p.onu_count}/${p.onu_max}`"></span>
                       </div>
-                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                      <div class="metric-track">
                         <div :style="{width: Math.min(p.percent,100)+'%', height:'100%', background: p.onu_count>=115?'#f85149':p.onu_count>=90?'#e3b341':p.onu_count>=64?'#58a6ff':'#3fb950'}"></div>
                       </div>
                     </div>
@@ -1115,7 +1138,7 @@
                         <span x-text="signalLabel(item.label)"></span>
                         <span x-text="item.count"></span>
                       </div>
-                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                      <div class="metric-track">
                         <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.signals))+'%', height:'100%', background: item.label==='normal'?'#3fb950':item.label==='warning'?'#e3b341':item.label==='critical'?'#f85149':'#8b949e'}"></div>
                       </div>
                     </div>
@@ -1135,7 +1158,7 @@
                         <span x-text="item.label"></span>
                         <span x-text="item.count"></span>
                       </div>
-                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                      <div class="metric-track">
                         <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.states))+'%', height:'100%', background: item.label==='working'?'#3fb950':item.label==='los'||item.label==='lof'?'#f85149':'#e3b341'}"></div>
                       </div>
                     </div>
@@ -1155,7 +1178,7 @@
                         <span x-text="item.label"></span>
                         <span x-text="item.count"></span>
                       </div>
-                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                      <div class="metric-track">
                         <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.models))+'%', height:'100%', background:'#8957e5'}"></div>
                       </div>
                     </div>
@@ -1175,7 +1198,7 @@
                         <span class="td-mono" x-text="item.label"></span>
                         <span x-text="item.count"></span>
                       </div>
-                      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                      <div class="metric-track">
                         <div :style="{width: chartPercent(item.count, chartMax(dashboardAnalytics?.firmwares))+'%', height:'100%', background:'#58a6ff'}"></div>
                       </div>
                     </div>

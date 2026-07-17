@@ -15,3 +15,4 @@ pyftpdlib
 python-dotenv
 Pillow
 pytz
+psutil>=5.9.0

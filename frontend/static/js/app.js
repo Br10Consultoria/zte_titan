@@ -4,7 +4,7 @@ function app() {
   return {
     // Branding
     logoExists: false,
-    logoSrc: '/static/img/logo.png',
+    logoSrc: '/static/img/br10-logo.png',
     appTitle: 'Br10Manager OLTS',
 
     // Auth
@@ -130,6 +130,8 @@ function app() {
 
     // Stats
     stats: {},
+    serverDateTime: '',
+    serverTimeOffset: 0,
     dashboardAnalytics: null,
     dashboardAnalyticsError: '',
     dashboardDrilldown: { show: false, type: '', label: '', value: '', rows: [] },
@@ -138,9 +140,11 @@ function app() {
     // INIT
     // ============================================================
     async init() {
+      this.updateServerClock();
+      setInterval(() => this.updateServerClock(), 1000);
       // Verifica se logo existe
       try {
-        const logoRes = await fetch('/static/img/logo.png', { method: 'HEAD' });
+        const logoRes = await fetch(this.logoSrc, { method: 'HEAD', cache: 'no-store' });
         this.logoExists = logoRes.ok;
       } catch (e) {
         this.logoExists = false;
@@ -326,6 +330,14 @@ function app() {
       this.stats.total_olts = this.olts.length;
       this.stats.online_olts = this.olts.filter(o => o.status === 'online').length;
       try {
+        const res = await this.apiGet('/dashboard/system');
+        if (res.ok) {
+          this.stats.system = await this.safeJson(res);
+          this.serverTimeOffset = new Date(this.stats.system.server_time).getTime() - Date.now();
+          this.updateServerClock();
+        }
+      } catch (e) {}
+      try {
         const res = await this.apiGet('/dashboard/analytics');
         if (res.ok) {
           this.dashboardAnalytics = await this.safeJson(res);
@@ -343,6 +355,29 @@ function app() {
 
     chartMax(items) {
       return Math.max(...(items || []).map(i => Number(i.count || i.onu_count || 0)), 1);
+    },
+
+    updateServerClock() {
+      const now = new Date(Date.now() + (this.serverTimeOffset || 0));
+      this.serverDateTime = now.toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    },
+
+    formatSystemBytes(bytes) {
+      const value = Number(bytes || 0);
+      if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
+      if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(0)} MB`;
+      return `${Math.round(value / 1024)} KB`;
+    },
+
+    formatUptime(seconds) {
+      const total = Math.max(0, Number(seconds || 0));
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      return days ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
     },
 
     chartPercent(value, max) {
