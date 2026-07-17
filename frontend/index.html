@@ -663,6 +663,134 @@
       .stat-grid { grid-template-columns: 1fr 1fr; }
       .login-card { width: 100%; padding: 28px 20px; }
     }
+
+    /* Identidade visual BR10 ACS */
+    :root {
+      --bg-base: #eef4f7;
+      --bg-surface: #ffffff;
+      --bg-card: #ffffff;
+      --bg-hover: #e7f0f4;
+      --bg-input: #ffffff;
+      --border: #d8e4ea;
+      --border-dim: #e5edf1;
+      --text-primary: #163047;
+      --text-secondary: #577184;
+      --text-muted: #7b929f;
+      --accent: #08618f;
+      --accent-dark: #064d73;
+      --accent-glow: rgba(8,97,143,.12);
+      --accent-border: rgba(8,97,143,.28);
+      --yellow: #ed8422;
+      --yellow-glow: rgba(237,132,34,.13);
+      --brand-gradient: linear-gradient(135deg,#08618f 0%,#1595c4 72%,#ed8422 100%);
+      --brand-glow: 0 8px 24px rgba(8,97,143,.18);
+      --sidebar-w: 228px;
+      --topbar-h: 58px;
+    }
+    body { font-size: 12px; }
+    .sidebar,
+    body.light-theme .sidebar {
+      background: linear-gradient(180deg,#041f33 0%,#072f49 60%,#0a4562 100%);
+      border-right: 0;
+      box-shadow: 8px 0 28px rgba(4,31,51,.12);
+    }
+    .sidebar-logo,
+    body.light-theme .sidebar-logo {
+      min-height: 82px;
+      padding: 12px 14px;
+      background: transparent;
+      border-bottom: 1px solid rgba(174,210,226,.16);
+    }
+    .sidebar-logo .logo-icon { width: 54px; height: 54px; border-radius: 0; }
+    .sidebar-logo .logo-icon img { width: 54px; height: 54px; border-radius: 0; }
+    .sidebar-logo .logo-name {
+      background: none;
+      -webkit-text-fill-color: #f5fbfe;
+      color: #f5fbfe;
+      font-size: 14px;
+    }
+    .sidebar-logo .logo-sub { color: #8db2c5; }
+    .nav-section { color: #6490a7; }
+    .nav-item { color: #a9c5d3; border-radius: 0; border-left: 3px solid transparent; }
+    .nav-item:hover { background: rgba(21,149,196,.13); color: #fff; }
+    .nav-item.active {
+      background: linear-gradient(90deg,rgba(21,149,196,.28),rgba(21,149,196,.08));
+      color: #fff;
+      border: 0;
+      border-left: 3px solid #ed8422;
+      box-shadow: none;
+    }
+    .nav-item.active::before { display: none; }
+    .sidebar-user { border-top-color: rgba(174,210,226,.16); }
+    .user-name { color: #f5fbfe; }
+    .user-role { color: #8db2c5; }
+    .topbar,
+    body.light-theme .topbar {
+      background: rgba(255,255,255,.96);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 4px 18px rgba(7,47,73,.04);
+    }
+    .main-content { background: var(--bg-base); }
+    .card,
+    body.light-theme .card {
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 24px rgba(7,47,73,.045);
+    }
+    .card-header,
+    body.light-theme .card-header {
+      background: #f7fafb;
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-card { border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(7,47,73,.04); }
+    .stat-card.blue::after { background: #1595c4; }
+    .stat-card.yellow::after { background: #ed8422; }
+    .btn-primary {
+      background: linear-gradient(135deg,#08618f,#087aa8);
+      box-shadow: 0 5px 12px rgba(8,97,143,.2);
+    }
+    .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg,#07547d,#08618f); }
+    .btn-warning { background: #ed8422; }
+    .btn-warning:hover:not(:disabled) { background: #c96512; }
+    .input-field:focus { border-color: #1595c4; box-shadow: 0 0 0 3px rgba(21,149,196,.13); }
+    .login-wrap,
+    body.light-theme .login-wrap {
+      background:
+        radial-gradient(circle at 78% 18%,rgba(237,132,34,.22),transparent 24%),
+        radial-gradient(circle at 16% 82%,rgba(21,149,196,.24),transparent 30%),
+        linear-gradient(135deg,#041f33 0%,#072f49 55%,#08618f 100%);
+    }
+    .login-card,
+    body.light-theme .login-card {
+      position: relative;
+      background: rgba(255,255,255,.98);
+      border: 1px solid rgba(255,255,255,.55);
+      border-radius: 16px;
+      box-shadow: 0 26px 80px rgba(4,31,51,.45);
+      overflow: hidden;
+    }
+    .login-card::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto;
+      height: 4px;
+      background: linear-gradient(90deg,#1595c4,#ed8422);
+    }
+    .login-logo img { width: 250px; max-width: 100%; height: 140px; margin-bottom: 8px; }
+    .login-logo .brand {
+      background: none;
+      -webkit-text-fill-color: #072f49;
+      color: #072f49;
+    }
+    .login-logo .brand-sub { color: #667b8c; }
+    .login-card .form-label { color: #38566b; }
+    .login-card .input-field { background: #fff; color: #163047; border-color: #d8e4ea; }
+    .theme-toggle { background: #f7fafb; color: #577184; }
+
+    @media (max-width: 900px) {
+      .sidebar-logo { min-height: var(--topbar-h); }
+      .sidebar-logo .logo-icon,
+      .sidebar-logo .logo-icon img { width: 42px; height: 42px; }
+    }
   </style>
 </head>
 <body>
