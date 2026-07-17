@@ -4,7 +4,7 @@ function app() {
   return {
     // Branding
     logoExists: false,
-    logoSrc: '/static/img/br10-logo.png',
+    logoSrc: '/static/img/br10-logo.png?v=2',
     appTitle: 'Br10Manager OLTS',
 
     // Auth
