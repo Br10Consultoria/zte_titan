@@ -685,7 +685,7 @@
       --brand-gradient: linear-gradient(135deg,#08618f 0%,#1595c4 72%,#ed8422 100%);
       --brand-glow: 0 8px 24px rgba(8,97,143,.18);
       --sidebar-w: 228px;
-      --topbar-h: 58px;
+      --topbar-h: 66px;
     }
     body { font-size: 12px; }
     .sidebar,
@@ -789,9 +789,8 @@
     .sidebar-logo { justify-content:center; }
     .sidebar-logo .logo-icon { width: 188px; height: 68px; }
     .sidebar-logo .logo-icon img { width: 188px; height: 68px; object-fit:contain; }
-    .topbar-brand-logo { width: 82px; height: 38px; object-fit: contain; flex-shrink: 0; }
     .topbar-system { display:flex;align-items:center;gap:6px;min-width:0;margin-left:8px;flex:1;overflow-x:auto; }
-    .system-chip { display:inline-flex;align-items:center;gap:5px;min-height:28px;padding:4px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg-surface);color:var(--text-secondary);font-size:10.5px;white-space:nowrap; }
+    .system-chip { display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:var(--bg-surface);color:var(--text-secondary);font-size:10.5px;white-space:nowrap; }
     .system-chip i { color: var(--accent); }
     .system-chip strong { color: var(--text-primary); font-weight:700; }
     .metric-track { height:8px;background:#163b55;border-radius:4px;overflow:hidden; }
@@ -811,7 +810,6 @@
       .sidebar-logo { min-height: var(--topbar-h); }
       .sidebar-logo .logo-icon,
       .sidebar-logo .logo-icon img { width: 52px; height: 42px; }
-      .topbar-brand-logo { display:none; }
       .topbar-system { overflow-x:auto; }
       .system-chip { padding:4px 6px; }
     }
@@ -1035,9 +1033,6 @@
         <button @click="sidebarCollapsed=!sidebarCollapsed" class="btn btn-ghost btn-icon" title="Recolher menu">
           <i class="fas fa-bars"></i>
         </button>
-        <template x-if="logoExists">
-          <img :src="logoSrc" alt="BR10 Network Solutions" class="topbar-brand-logo" />
-        </template>
         <div class="topbar-title" x-show="page !== 'dashboard'">
           <i :class="page==='dashboard'?'fas fa-gauge-high':page==='olts'?'fas fa-server':page==='onus'?'fas fa-network-wired':page==='uncfg'?'fas fa-circle-exclamation':page==='search'?'fas fa-magnifying-glass':page==='backups'?'fas fa-cloud-arrow-up':page==='users'?'fas fa-users':'fas fa-user-gear'"></i>
           <span x-text="page==='dashboard'?'Dashboard':page==='olts'?'Gerenciamento de OLTs':page==='onus'?'Status das ONUs':page==='uncfg'?'ONUs Não Provisionadas':page==='search'?'Buscar ONU por Serial':page==='backups'?'Backups de OLT':page==='users'?'Gerenciamento de Usuários':'Meu Perfil'"></span>
