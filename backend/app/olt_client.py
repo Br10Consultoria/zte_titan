@@ -388,30 +388,30 @@ class OLTTelnetClient:
             self.tn = SimpleTelnet(self.ip, self.port, timeout=settings.SSH_TIMEOUT)
             self.tn.open()
 
-            # Aguarda prompt de usuario antes de enviar login. A Parks 3000/4000
-            # primeiro exibe "Press <RETURN> to get started" e so depois do ENTER
-            # mostra Username/Password.
-            data = self.tn.read_very_eager(wait=1.5)
-            decoded_pre = data.decode("utf-8", errors="replace")
-            if "press <return>" in decoded_pre.lower() or "press return" in decoded_pre.lower():
-                _log("debug", "[TELNET] Banner Parks detectado; enviando ENTER inicial")
-                self.tn.write(b"\n")
-                time.sleep(0.5)
-                data += self.tn.read_until(b"Username:", timeout=15)
-            elif "Username:" not in decoded_pre:
-                data += self.tn.read_until(b"Username:", timeout=25)
-            decoded_pre = data.decode("utf-8", errors="replace")
-            if "Username:" not in decoded_pre and (
-                "press <return>" in decoded_pre.lower() or
-                "press return" in decoded_pre.lower()
-            ):
-                _log("debug", "[TELNET] Banner Parks recebido apos espera; enviando ENTER inicial")
-                self.tn.write(b"\n")
-                time.sleep(0.5)
-                data += self.tn.read_until(b"Username:", timeout=15)
+            # Aguarda o prompt de login reagindo imediatamente ao banner da Parks.
+            # A Parks 3000/4000 mostra "Press <RETURN> to get started" antes de
+            # Username; se esperarmos apenas Username, o login demora ate timeout.
+            data = b""
+            sent_initial_enter = False
+            login_deadline = time.time() + 25
+            decoded_pre = ""
+            while time.time() < login_deadline:
+                data += self.tn.read_very_eager(wait=0.4)
                 decoded_pre = data.decode("utf-8", errors="replace")
+                lower_pre = decoded_pre.lower()
+                if "username:" in lower_pre:
+                    break
+                if not sent_initial_enter and (
+                    "press <return>" in lower_pre or "press return" in lower_pre
+                ):
+                    _log("debug", "[TELNET] Banner Parks detectado; enviando ENTER inicial")
+                    self.tn.write(b"\n")
+                    sent_initial_enter = True
+                    time.sleep(0.3)
+                    continue
+                time.sleep(0.1)
             _log("debug", f"[TELNET] Recebido antes de Username: {decoded_pre[-200:]}")
-            if "Username:" not in decoded_pre:
+            if "username:" not in decoded_pre.lower():
                 raise OLTConnectionError(
                     f"Login Telnet falhou - prompt Username nao encontrado. "
                     f"Resposta: {decoded_pre[-200:]}"
