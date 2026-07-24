@@ -513,15 +513,19 @@ def get_unconfigured_onus(
     try:
         client = get_olt_client(olt.ip, olt.port, olt.username, olt.password, olt.protocol)
         client.connect()
-        # Comando para ONUs não configuradas (igual para todos os modelos ZTE)
-        out = client.execute_command("show pon onu uncfg", timeout=30)
-        if "%Error" in out or "Invalid" in out or "Unknown" in out:
-            logger.warning("[UNCFG] show pon onu uncfg falhou; tentando comando legado")
-            out = client.execute_command("show gpon onu uncfg", timeout=30)
+        if getattr(driver, "model_key", "") == "parks_3000_4000":
+            out = client.execute_command(driver.cmd_uncfg_onus(), timeout=30)
+            onus = driver.parse_uncfg_onus(out)
+        else:
+            out = client.execute_command("show pon onu uncfg", timeout=30)
+            if "%Error" in out or "Invalid" in out or "Unknown" in out:
+                logger.warning("[UNCFG] show pon onu uncfg falhou; tentando comando legado")
+                out = client.execute_command("show gpon onu uncfg", timeout=30)
+
+            from ..olt_client import parse_uncfg_onus
+            onus = parse_uncfg_onus(out)
         client.disconnect()
 
-        from ..olt_client import parse_uncfg_onus
-        onus = parse_uncfg_onus(out)
         result = {
             "olt_id": olt_id,
             "onus":   onus,

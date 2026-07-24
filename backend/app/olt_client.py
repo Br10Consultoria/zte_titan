@@ -880,6 +880,34 @@ def parse_optical_module_info(output: str) -> Dict:
                 result[key] = value
         else:
             result[key] = value
+
+    # Parks 3000/4000: show interface gponX/Y sfp
+    parks_patterns = {
+        "vendor": r"Name\s*:\s*(\S+)",
+        "product": r"PN\s*:\s*(\S+)",
+        "sequence_number": r"SN\s*:\s*(\S+)",
+        "version_level": r"Rev\s*:\s*(\S+)",
+        "connector": r"Connector\s*:\s*(\S+)",
+        "wavelength": r"Laser Wavelength\s*:\s*(\d+)\s*nm",
+        "temperature": r"Temperature\s*:\s*([-\d.]+)\s*C",
+        "supply_voltage": r"Supply Voltage\s*:\s*([-\d.]+)\s*V",
+        "tx_power": r"TX Output Power\s*:\s*([-\d.]+)\s*dBm",
+        "rx_power": r"RX Input Power\s*:\s*([-\d.]+)\s*dBm",
+    }
+    for key, pattern in parks_patterns.items():
+        if key in result:
+            continue
+        m = re.search(pattern, output, re.IGNORECASE)
+        if not m:
+            continue
+        value = m.group(1).strip()
+        if key in {"temperature", "supply_voltage", "tx_power", "rx_power"}:
+            try:
+                result[key] = float(value)
+            except ValueError:
+                result[key] = value
+        else:
+            result[key] = value
     return result
 
 
@@ -1081,6 +1109,8 @@ def test_olt_connection(ip: str, port: int, username: str, password: str,
         client = get_olt_client(ip, port, username, password, protocol)
         client.connect()
         output = client.execute_command("show software")
+        if "%Error" in output or "Invalid" in output or "Unknown" in output:
+            output = client.execute_command("show version")
         _log("info", f"[TEST] Conexão OK em {ip}:{port}")
         return True, output
     except OLTConnectionError as e:
@@ -1240,14 +1270,14 @@ def get_onu_full_details(ip: str, port: int, username: str, password: str,
         cmd_detail = driver.cmd_onu_detail(onu_ref) if driver else f"show gpon onu detail-info {onu_ref}"
         _log("info", f"[ONU_FULL] {cmd_detail}")
         out = client.execute_command(cmd_detail, timeout=20)
-        result["detail"] = parse_onu_detail(out, onu_idx)
+        result["detail"] = driver.parse_onu_detail(out) if driver else parse_onu_detail(out, onu_idx)
 
         # 2. Potência e atenuação
         cmd_power = driver.cmd_onu_power(onu_ref) if driver else f"show pon power attenuation {onu_ref}"
         _log("info", f"[ONU_FULL] {cmd_power}")
         out = client.execute_command(cmd_power, timeout=15)
         _log("debug", f"[ONU_FULL] Output bruto power attenuation ({len(out)} chars): {repr(out[:500])}")
-        result["power"] = parse_onu_power(out, onu_idx)
+        result["power"] = driver.parse_onu_power(out) if driver else parse_onu_power(out, onu_idx)
         _log("debug", f"[ONU_FULL] Power parsed: {result['power']}")
 
         # 3. VLAN/service configurado na CPE

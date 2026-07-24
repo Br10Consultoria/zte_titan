@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import BackupJob, BackupSettings, OLT
 from .olt_client import OLTConnectionError, get_olt_client
+from .olt_driver import get_driver
 
 logger = logging.getLogger("routes.backups")
 
@@ -283,9 +284,13 @@ def run_backup_job(job_id: int, send_telegram_flag: bool = True):
         if ftp_path.exists():
             ftp_path.unlink()
 
-        command = (
-            f"copy ftp root: {settings.source_path} "
-            f"//{settings.server_ip}/{ftp_filename}@{settings.ftp_user}:{settings.ftp_password}"
+        driver = get_driver(olt.olt_model)
+        command = driver.cmd_backup_to_ftp(
+            settings.server_ip,
+            ftp_filename,
+            settings.ftp_user,
+            settings.ftp_password,
+            settings.source_path,
         )
 
         logger.info(f"[BACKUP] Executando backup da OLT {olt.id} {olt.ip}")

@@ -39,9 +39,16 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
     onus = driver.parse_onu_state(output)
 
     base_map = {}
+    base_serial_map = {}
     try:
         base_out = client.execute_command(driver.cmd_onu_baseinfo(iface), timeout=30)
-        base_map = {b["onu_index"]: b for b in driver.parse_onu_baseinfo(base_out)}
+        base_items = driver.parse_onu_baseinfo(base_out)
+        base_map = {b["onu_index"]: b for b in base_items if b.get("onu_index")}
+        base_serial_map = {
+            str(b.get("serial", "")).upper(): b
+            for b in base_items
+            if b.get("serial")
+        }
     except Exception as exc:
         logger.warning(f"[CACHE] Falha baseinfo {iface}: {exc}")
 
@@ -73,18 +80,22 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
 
     for onu in onus:
         idx = onu["onu_index"]
-        base = base_map.get(idx, {})
+        serial_key = str(onu.get("serial", "")).upper()
+        base = base_map.get(idx) or base_serial_map.get(serial_key, {})
         detail = detail_map.get(idx, {})
-        onu["serial"] = base.get("serial", "")
-        onu["model"] = base.get("model", "")
-        onu["description"] = detail.get("description", "")
-        onu["online_duration"] = detail.get("online_duration", "")
+        onu["serial"] = onu.get("serial") or base.get("serial", "")
+        onu["model"] = base.get("model", onu.get("model", ""))
+        onu["description"] = detail.get("description", onu.get("description", ""))
+        onu["online_duration"] = detail.get("online_duration", onu.get("online_duration", ""))
         power = power_map.get(idx, {})
         if power:
-            onu["rx_power"] = power.get("rx_power")
-            onu["onu_rx_power"] = power.get("rx_power")
-            onu["rx_status"] = power.get("rx_status")
-            onu["tx_power"] = power.get("tx_power")
+            if power.get("rx_power") is not None:
+                onu["rx_power"] = power.get("rx_power")
+                onu["onu_rx_power"] = power.get("rx_power")
+            if power.get("rx_status") is not None:
+                onu["rx_status"] = power.get("rx_status")
+            if power.get("tx_power") is not None:
+                onu["tx_power"] = power.get("tx_power")
 
         rx_val = rx_map.get(idx)
         if rx_val is not None:
@@ -96,8 +107,8 @@ def collect_pon_status(client, driver, olt: OLT, port: OLTPort, include_details:
             else:
                 onu["olt_rx_status"] = "critical"
         else:
-            onu["olt_rx_power"] = None
-            onu["olt_rx_status"] = None
+            onu["olt_rx_power"] = onu.get("olt_rx_power")
+            onu["olt_rx_status"] = onu.get("olt_rx_status")
 
     online = sum(1 for onu in onus if onu["oper_state"] == "working")
     offline = sum(1 for onu in onus if onu["oper_state"] not in ("working", "initial", "ranging"))

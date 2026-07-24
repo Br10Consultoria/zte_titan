@@ -281,14 +281,17 @@ def discover_ports(
             # Para C320:      slot=1 (fixo), card=1..8, pon=1..32
             logger.info("[DISCOVER] Iniciando varredura porta a porta para descobrir portas vazias")
             seen = {(p["slot"], p.get("card", 1), p["pon"]) for p in ports}  # já encontradas
-            is_c300 = getattr(driver, 'model_key', '') == 'zte_c300'
-            slot_range = range(1, 3) if is_c300 else range(1, 2)  # C300: slots 1-2; C320: slot 1 fixo
-            card_range = range(1, 9)   # até 8 placas (cobre C320/C300/C610/C620/C650)
+            model_key = getattr(driver, 'model_key', '')
+            is_c300 = model_key == 'zte_c300'
+            is_parks = model_key == 'parks_3000_4000'
+            slot_range = range(1, 2) if is_parks else (range(1, 3) if is_c300 else range(1, 2))
+            card_range = range(1, 2) if is_parks else range(1, 9)
+            pon_range = range(1, 17) if is_parks else range(1, 33)
             consecutive_empty = 0  # para parar cedo quando não há mais placas
             for slot in slot_range:
                 for card in card_range:
                     card_has_any = False
-                    for pon in range(1, 33):  # até 32 PONs por placa
+                    for pon in pon_range:
                         key = (slot, card, pon)
                         if key in seen:
                             card_has_any = True
@@ -479,9 +482,13 @@ def get_olt_full_status(
         result = {"olt_id": olt_id, "name": olt.name, "ip": olt.ip}
 
         out = client.execute_command("show software")
+        if "%Error" in out or "Invalid" in out or "Unknown" in out:
+            out = client.execute_command("show version")
         result["software"] = out[:1000]
 
         out = client.execute_command("show uptime")
+        if "%Error" in out or "Invalid" in out or "Unknown" in out:
+            out = client.execute_command("show interface gpon1/1")
         result["uptime"] = out[:500]
 
         client.disconnect()

@@ -660,6 +660,9 @@ function app() {
       if (normalizedModel === 'zte_c600' || normalizedModel === 'zte_c320') {
         return `gpon_olt-${slot}/${card || 1}/${pon}`;
       }
+      if (normalizedModel === 'parks_3000_4000') {
+        return `gpon${slot}/${pon}`;
+      }
       return `gpon-olt_${slot}/${card || 1}/${pon}`;
     },
 
