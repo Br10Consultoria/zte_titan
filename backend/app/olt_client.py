@@ -401,6 +401,15 @@ class OLTTelnetClient:
             elif "Username:" not in decoded_pre:
                 data += self.tn.read_until(b"Username:", timeout=25)
             decoded_pre = data.decode("utf-8", errors="replace")
+            if "Username:" not in decoded_pre and (
+                "press <return>" in decoded_pre.lower() or
+                "press return" in decoded_pre.lower()
+            ):
+                _log("debug", "[TELNET] Banner Parks recebido apos espera; enviando ENTER inicial")
+                self.tn.write(b"\n")
+                time.sleep(0.5)
+                data += self.tn.read_until(b"Username:", timeout=15)
+                decoded_pre = data.decode("utf-8", errors="replace")
             _log("debug", f"[TELNET] Recebido antes de Username: {decoded_pre[-200:]}")
             if "Username:" not in decoded_pre:
                 raise OLTConnectionError(
