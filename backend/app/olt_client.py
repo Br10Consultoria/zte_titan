@@ -219,11 +219,25 @@ class OLTSSHClient:
             if self.shell.recv_ready():
                 banner = self.shell.recv(8192).decode("utf-8", errors="replace")
                 _log("debug", f"[SSH] Banner: {banner[:200]}")
-            # Desabilita paginação
-            self.shell.send("terminal length 0\n")
-            time.sleep(0.8)
-            if self.shell.recv_ready():
-                self.shell.recv(8192)
+            # Desabilita paginacao quando suportado. Algumas Parks fecham o canal
+            # SSH ao receber esse comando logo apos o login; nesse caso reabrimos
+            # o shell e seguimos sem tratar isso como falha de conexao.
+            try:
+                self.shell.send("terminal length 0\n")
+                time.sleep(0.8)
+                if self.shell.recv_ready():
+                    self.shell.recv(8192)
+            except OSError as e:
+                _log("warning", f"[SSH] Paginacao nao aplicada em {self.ip}: {e}; reabrindo shell")
+                try:
+                    if self.shell:
+                        self.shell.close()
+                except Exception:
+                    pass
+                self.shell = self.client.invoke_shell(width=300, height=50)
+                time.sleep(1.0)
+                if self.shell.recv_ready():
+                    self.shell.recv(8192)
             _log("info", f"[SSH] Conectado com sucesso a {self.ip}:{self.port}")
         except OLTConnectionError:
             raise
@@ -231,12 +245,15 @@ class OLTSSHClient:
             raise OLTConnectionError(f"Falha SSH em {self.ip}:{self.port} — {e}")
 
     def execute_command(self, command: str, timeout: int = None) -> str:
-        if not self.shell:
+        if not self.shell or getattr(self.shell, "closed", False):
             raise OLTConnectionError("Shell SSH não disponível")
 
         timeout = timeout or settings.SSH_COMMAND_TIMEOUT
         _log("info", f"[SSH] Executando: {_redact_command(command)}")
-        self.shell.send(command + "\n")
+        try:
+            self.shell.send(command + "\n")
+        except OSError as e:
+            raise OLTConnectionError(f"Shell SSH fechado ao executar comando - {e}")
         time.sleep(0.5)
 
         output = ""
